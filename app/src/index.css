@@ -1,6 +1,14 @@
 @import "tailwindcss";
 @import "leaflet/dist/leaflet.css";
 
+.interest-options {
+  scrollbar-width: none;
+}
+
+.interest-options::-webkit-scrollbar {
+  display: none;
+}
+
 html,
 body,
 #root {
@@ -12,4 +20,73 @@ body {
   font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
   background: #f4f1ea;
   color: #1c1a17;
+}
+
+.map-action {
+  display: grid;
+  place-items: center;
+  color: #1c1a17;
+  cursor: pointer;
+}
+
+.map-action:hover:not(:disabled) {
+  background: #f0f3f5;
+}
+
+.map-action:focus-visible {
+  outline: 2px solid #248a9c;
+  outline-offset: 3px;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+html[data-theme="dark"] body {
+  background: #111820;
+  color: #e5ecf3;
+}
+
+html[data-theme="dark"] .brand-surface {
+  background-color: #c6d0d9;
+  border-color: #8c9daa;
+}
+
+html[data-theme="dark"] :is([class~="bg-white"], [class~="bg-white/95"], [class~="bg-white/90"], [class~="bg-white/60"]):not(.brand-surface) {
+  background-color: #202b38;
+  color: #e5ecf3;
+}
+
+html[data-theme="dark"] :is([class~="bg-[#f4f1ea]"], [class~="bg-[#faf8f4]"], [class~="bg-gray-50"]) {
+  background-color: #161f2a;
+}
+
+html[data-theme="dark"] :is([class~="border-gray-100"], [class~="border-gray-200"], [class~="border-gray-300"]):not(.brand-surface) {
+  border-color: #3a495a;
+}
+
+html[data-theme="dark"] :is([class~="text-gray-400"], [class~="text-gray-500"], [class~="text-gray-600"], [class~="text-gray-700"]) {
+  color: #b4c1cf;
+}
+
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder {
+  color: #a7b5c5;
+}
+
+html[data-theme="dark"] .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.78) saturate(0.65);
+}
+
+html[data-theme="dark"] :is(.leaflet-container, .leaflet-tooltip, .leaflet-control-attribution) {
+  background-color: #202b38;
+  color: #e5ecf3;
+}
+
+html[data-theme="dark"] .leaflet-control-attribution a {
+  color: #8ad1de;
+}
+
+html[data-theme="dark"] .map-action:hover:not(:disabled) {
+  background: #344457;
 }

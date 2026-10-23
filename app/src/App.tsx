@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { CircleMarker, MapContainer, Marker, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import stationData from './data/stations.json'
@@ -43,7 +43,11 @@ const BASEMAPS = {
   },
 } as const
 
-const INTERESTS = ['🥾 Hike', '🚲 Cycle', '♨️ Onsen', '⛳ Golf', '🍁 Autumn leaves']
+const INTERESTS = [
+  '🥾 Hike', '🚲 Cycle', '♨️ Onsen', '⛳ Golf', '🍁 Autumn leaves',
+  '☕ Cafés', '🍱 Local food', '🏯 Culture', '🌊 Lake views',
+  '🌳 Easy walks', '👨‍👩‍👧 Family trips', '📷 Photography', '🏕️ Camping',
+]
 
 const pinIcon = L.divIcon({
   className: '',
@@ -86,6 +90,26 @@ function ClickHandler({ onPick }: { onPick: (p: LatLng) => void }) {
   return null
 }
 
+function ZoomControls() {
+  const map = useMap()
+  const controls = useRef<HTMLDivElement>(null)
+  const [zoom, setZoom] = useState(map.getZoom())
+  useMapEvents({ zoomend: () => setZoom(map.getZoom()) })
+  useEffect(() => {
+    const element = controls.current
+    if (!element) return
+    L.DomEvent.disableClickPropagation(element)
+    L.DomEvent.disableScrollPropagation(element)
+    return () => { L.DomEvent.off(element) }
+  }, [])
+  return (
+    <div ref={controls} className="absolute right-[18px] bottom-[184px] z-[1000] flex flex-col gap-1" role="group" aria-label="Map zoom">
+      <button type="button" onClick={() => map.zoomIn()} disabled={zoom >= map.getMaxZoom()} aria-label="Zoom in" title="Zoom in" className="map-action h-8 w-8 rounded-lg bg-white text-xl shadow-lg disabled:opacity-40">+</button>
+      <button type="button" onClick={() => map.zoomOut()} disabled={zoom <= map.getMinZoom()} aria-label="Zoom out" title="Zoom out" className="map-action h-8 w-8 rounded-lg bg-white text-xl shadow-lg disabled:opacity-40">−</button>
+    </div>
+  )
+}
+
 function FitSpots({ spots }: { spots: Spot[] }) {
   const map = useMap()
   useEffect(() => {
@@ -117,6 +141,11 @@ function ResizeWatcher() {
 const newId = () => Math.random().toString(36).slice(2, 10)
 
 export default function App() {
+  const [darkMode, setDarkMode] = useState(() => load<boolean>('tabilens.darkMode', false) === true)
+  useEffect(() => {
+    document.documentElement.dataset.theme = darkMode ? 'dark' : 'light'
+    save('tabilens.darkMode', darkMode)
+  }, [darkMode])
   const [basemap, setBasemap] = useState<keyof typeof BASEMAPS>('osm')
   const [query, setQuery] = useState('')
   const [interest, setInterest] = useState<string | null>(null)
@@ -291,13 +320,13 @@ export default function App() {
 
   const searchBox = (
     <div className="pointer-events-none grid w-full grid-cols-[auto_minmax(0,1fr)] items-center gap-3">
-      <span className="flex self-stretch items-center rounded-2xl bg-white/95 px-2 shadow-sm backdrop-blur">
+      <span className="brand-surface flex self-stretch items-center rounded-2xl border border-gray-200 bg-white/95 px-2 shadow-sm backdrop-blur">
         <span className="relative m-[3px] block h-[60px] w-[136px] overflow-hidden">
           <img src="/logo_full.png" alt="TabiLens" draggable={false} className="absolute -top-[20px] -left-[24px] w-[184px] max-w-none" />
         </span>
       </span>
       <form
-        className="pointer-events-auto flex min-w-0 gap-2 rounded-2xl border border-gray-200 bg-white/95 p-1.5 shadow-lg backdrop-blur"
+        className="pointer-events-auto flex min-w-0 self-stretch items-center gap-2 rounded-2xl border border-gray-200 bg-white/95 p-1.5 shadow-lg backdrop-blur"
         onSubmit={(e) => {
           e.preventDefault()
           void explore()
@@ -314,7 +343,7 @@ export default function App() {
           {busy ? 'Exploring…' : 'Explore'}
         </button>
       </form>
-      <div className="pointer-events-auto col-span-2 flex gap-2 overflow-x-auto pb-1" role="group" aria-label="Filter by interest">
+      <div className="interest-options pointer-events-auto col-span-2 flex gap-2 overflow-x-auto pb-1" role="group" aria-label="Filter by interest" tabIndex={0}>
         {INTERESTS.map((i) => (
           <button
             key={i}
@@ -338,6 +367,7 @@ export default function App() {
         <ClickHandler onPick={pick} />
         <FlyTo target={flyTarget} />
         <ResizeWatcher />
+        <ZoomControls />
 
         {STATIONS.map((s) => (
           <CircleMarker
@@ -384,12 +414,15 @@ export default function App() {
       </div>
 
       <div className="absolute right-3 bottom-6 z-[1000] flex flex-col gap-2">
-        <button onClick={locate} className="h-11 w-11 rounded-full bg-white text-lg shadow-lg" aria-label="Show my location" title="Show my location">
+        <button type="button" onClick={() => setDarkMode((dark) => !dark)} aria-pressed={darkMode} aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'} title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'} className="map-action h-11 w-11 rounded-full bg-white text-xl shadow-lg">
+          <span aria-hidden="true">{darkMode ? '☀' : '☾'}</span>
+        </button>
+        <button onClick={locate} className="map-action h-11 w-11 rounded-full bg-white text-lg shadow-lg" aria-label="Show my location" title="Show my location">
           ◎
         </button>
         <button
           onClick={() => setBasemap(basemap === 'osm' ? 'gsi' : 'osm')}
-          className="h-11 w-11 rounded-full bg-white text-xs font-medium shadow-lg"
+          className="map-action h-11 w-11 rounded-full bg-white text-xs font-medium shadow-lg"
           title="Switch map style"
         >
           {BASEMAPS[basemap === 'osm' ? 'gsi' : 'osm'].label}
