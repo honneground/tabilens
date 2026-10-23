@@ -10,4 +10,5 @@ Each prototype folder should have:
 
 | Folder | Idea | Data used |
 |---|---|---|
-| [tabilens](tabilens/) | Map of magazine day-trip spots with Tobu trains | ADDIX, Tobu |
+| [tabilens-oskar](tabilens-oskar/) | Leaflet map of magazine day-trip spots with Tobu trains; Claude extracts places, free geocoding | ADDIX, Tobu |
+| [tabilens-jonas](tabilens-jonas/) | Mood prompt to itinerary: magazine spot with photo, Tobu rail and bus timetable, Chronicle audio for the ride; Google Maps route, mock mode for zero-credit demos | ADDIX, Tobu, Chronicle |

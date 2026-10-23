@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Fraunces", Georgia, serif;
+  --font-sans: "Noto Sans JP", system-ui, sans-serif;
+
+  --color-paper: #f6f1e7;
+  --color-ink: #1d2420;
+  --color-moss: #2f5d46;
+  --color-moss-dark: #1f3a2e;
+  --color-maple: #c4532d;
+  --color-rail: #1a4f8b;
+  --color-line: #ddd3c2;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
