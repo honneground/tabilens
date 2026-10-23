@@ -1,0 +1,15 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  background: #f4f1ea;
+  color: #1c1a17;
+}

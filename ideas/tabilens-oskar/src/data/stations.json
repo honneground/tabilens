@@ -1,0 +1,557 @@
+{
+ "source": "Tobu Railway data via Redpine tobu--find_stop (coordinates from Wikidata). Partial seed list.",
+ "stations": [
+  {
+   "id": "TS-01",
+   "name": "浅草",
+   "name_en": "Asakusa",
+   "line": "main",
+   "lat": 35.711944,
+   "lon": 139.798333
+  },
+  {
+   "id": "TS-08",
+   "name": "牛田",
+   "name_en": "Ushida",
+   "line": "main",
+   "lat": 35.744389,
+   "lon": 139.811278
+  },
+  {
+   "id": "TS-09",
+   "name": "北千住",
+   "name_en": "Kita-Senju",
+   "line": "main",
+   "lat": 35.749406,
+   "lon": 139.805103
+  },
+  {
+   "id": "TS-11",
+   "name": "五反野",
+   "name_en": "Gotanno",
+   "line": "main",
+   "lat": 35.765778,
+   "lon": 139.810056
+  },
+  {
+   "id": "TS-14",
+   "name": "竹ノ塚",
+   "name_en": "Takenotsuka",
+   "line": "main",
+   "lat": 35.7945,
+   "lon": 139.790778
+  },
+  {
+   "id": "TS-15",
+   "name": "谷塚",
+   "name_en": "Yatsuka",
+   "line": "main",
+   "lat": 35.814169,
+   "lon": 139.801317
+  },
+  {
+   "id": "TS-17",
+   "name": "獨協大学前",
+   "name_en": "Dokkyodaigakumae",
+   "line": "main",
+   "lat": 35.843472,
+   "lon": 139.800728
+  },
+  {
+   "id": "TS-18",
+   "name": "新田",
+   "name_en": "Shinden",
+   "line": "main",
+   "lat": 35.853872,
+   "lon": 139.795733
+  },
+  {
+   "id": "TS-27",
+   "name": "春日部",
+   "name_en": "Kasukabe",
+   "line": "main",
+   "lat": 35.979994,
+   "lon": 139.752386
+  },
+  {
+   "id": "TS-28",
+   "name": "北春日部",
+   "name_en": "Kita-kasukabe",
+   "line": "main",
+   "lat": 35.990656,
+   "lon": 139.744011
+  },
+  {
+   "id": "TS-30",
+   "name": "東武動物公園",
+   "name_en": "Tōbu-dōbutsu-kōen",
+   "line": "main",
+   "lat": 36.024972,
+   "lon": 139.726639
+  },
+  {
+   "id": "TN-01",
+   "name": "杉戸高野台",
+   "name_en": "Sugito-Takanodai",
+   "line": "main",
+   "lat": 36.051556,
+   "lon": 139.714611
+  },
+  {
+   "id": "TN-15",
+   "name": "東武金崎",
+   "name_en": "Tōbu Kanasaki",
+   "line": "main",
+   "lat": 36.4663,
+   "lon": 139.749
+  },
+  {
+   "id": "TN-17",
+   "name": "樅山",
+   "name_en": "Momiyama",
+   "line": "main",
+   "lat": 36.5324,
+   "lon": 139.7421
+  },
+  {
+   "id": "TN-23",
+   "name": "下今市",
+   "name_en": "Shimo-Imaichi",
+   "line": "main",
+   "lat": 36.7256,
+   "lon": 139.6932
+  },
+  {
+   "id": "TN-24",
+   "name": "上今市",
+   "name_en": "Kami-Imaichi",
+   "line": "main",
+   "lat": 36.7277,
+   "lon": 139.6809
+  },
+  {
+   "id": "TN-25",
+   "name": "東武日光",
+   "name_en": "Tōbu Nikkō",
+   "line": "main",
+   "lat": 36.747917,
+   "lon": 139.6195
+  },
+  {
+   "id": "TN-31",
+   "name": "野州平川",
+   "name_en": "Yashū-Hirakawa",
+   "line": "main",
+   "lat": 36.401769,
+   "lon": 139.75388
+  },
+  {
+   "id": "TN-32",
+   "name": "野州大塚",
+   "name_en": "Yashū-Ōtsuka",
+   "line": "main",
+   "lat": 36.408935,
+   "lon": 139.773299
+  },
+  {
+   "id": "TN-37",
+   "name": "西川田",
+   "name_en": "Nishikawada",
+   "line": "main",
+   "lat": 36.514722,
+   "lon": 139.850833
+  },
+  {
+   "id": "TN-39",
+   "name": "南宇都宮",
+   "name_en": "Minami-Utsunomiya",
+   "line": "main",
+   "lat": 36.544,
+   "lon": 139.8718
+  },
+  {
+   "id": "TN-40",
+   "name": "東武宇都宮",
+   "name_en": "Tōbu-Utsunomiya",
+   "line": "main",
+   "lat": 36.5591,
+   "lon": 139.88
+  },
+  {
+   "id": "TN-55",
+   "name": "東武ワールドスクウェア",
+   "name_en": "Tobu World Square",
+   "line": "main",
+   "lat": 36.808556,
+   "lon": 139.709194
+  },
+  {
+   "id": "TN-56",
+   "name": "鬼怒川温泉",
+   "name_en": "Kinugawa-Onsen",
+   "line": "main",
+   "lat": 36.8227,
+   "lon": 139.7163
+  },
+  {
+   "id": "TN-57",
+   "name": "鬼怒川公園",
+   "name_en": "Kinugawa-Kōen",
+   "line": "main",
+   "lat": 36.8409,
+   "lon": 139.7228
+  },
+  {
+   "id": "TI-08",
+   "name": "川俣",
+   "name_en": "Kawamata",
+   "line": "main",
+   "lat": 36.2085,
+   "lon": 139.5263
+  },
+  {
+   "id": "TI-10",
+   "name": "館林",
+   "name_en": "Tatebayashi",
+   "line": "main",
+   "lat": 36.245972,
+   "lon": 139.52825
+  },
+  {
+   "id": "TI-14",
+   "name": "東武和泉",
+   "name_en": "Tōbu-Izumi",
+   "line": "main",
+   "lat": 36.315111,
+   "lon": 139.455306
+  },
+  {
+   "id": "TI-16",
+   "name": "野州山辺",
+   "name_en": "Yashū-Yamabe",
+   "line": "main",
+   "lat": 36.32625,
+   "lon": 139.431861
+  },
+  {
+   "id": "TI-17",
+   "name": "韮川",
+   "name_en": "Niragawa",
+   "line": "main",
+   "lat": 36.307917,
+   "lon": 139.401694
+  },
+  {
+   "id": "TI-18",
+   "name": "太田",
+   "name_en": "Ōta",
+   "line": "main",
+   "lat": 36.294139,
+   "lon": 139.378778
+  },
+  {
+   "id": "TI-21",
+   "name": "世良田",
+   "name_en": "Serada",
+   "line": "main",
+   "lat": 36.2729,
+   "lon": 139.2819
+  },
+  {
+   "id": "TI-32",
+   "name": "田島",
+   "name_en": "Tajima",
+   "line": "main",
+   "lat": 36.290528,
+   "lon": 139.565083
+  },
+  {
+   "id": "TI-33",
+   "name": "佐野市",
+   "name_en": "Sanoshi",
+   "line": "main",
+   "lat": 36.3061,
+   "lon": 139.576
+  },
+  {
+   "id": "TI-34",
+   "name": "佐野",
+   "name_en": "Sano",
+   "line": "main",
+   "lat": 36.316669,
+   "lon": 139.579017
+  },
+  {
+   "id": "TI-37",
+   "name": "田沼",
+   "name_en": "Tanuma",
+   "line": "main",
+   "lat": 36.366944,
+   "lon": 139.581583
+  },
+  {
+   "id": "TI-38",
+   "name": "多田",
+   "name_en": "Tada",
+   "line": "main",
+   "lat": 36.378333,
+   "lon": 139.593333
+  },
+  {
+   "id": "TI-42",
+   "name": "本中野",
+   "name_en": "Hon-Nakano",
+   "line": "main",
+   "lat": 36.2585,
+   "lon": 139.4697
+  },
+  {
+   "id": "TJ-01",
+   "name": "池袋",
+   "name_en": "Ikebukuro",
+   "line": "tojo",
+   "lat": 35.730278,
+   "lon": 139.711389
+  },
+  {
+   "id": "TJ-02",
+   "name": "北池袋",
+   "name_en": "Kita-Ikebukuro",
+   "line": "tojo",
+   "lat": 35.7415,
+   "lon": 139.7168
+  },
+  {
+   "id": "TJ-04",
+   "name": "大山",
+   "name_en": "Ōyama",
+   "line": "tojo",
+   "lat": 35.7485,
+   "lon": 139.702
+  },
+  {
+   "id": "TJ-08",
+   "name": "東武練馬",
+   "name_en": "Tōbu-Nerima",
+   "line": "tojo",
+   "lat": 35.768657,
+   "lon": 139.661811
+  },
+  {
+   "id": "TJ-09",
+   "name": "下赤塚",
+   "name_en": "Shimo-Akatsuka",
+   "line": "tojo",
+   "lat": 35.7704,
+   "lon": 139.6443
+  },
+  {
+   "id": "TJ-15",
+   "name": "柳瀬川",
+   "name_en": "Yanasegawa",
+   "line": "tojo",
+   "lat": 35.8307,
+   "lon": 139.562
+  },
+  {
+   "id": "TJ-17",
+   "name": "鶴瀬",
+   "name_en": "Tsuruse",
+   "line": "tojo",
+   "lat": 35.8459,
+   "lon": 139.54
+  },
+  {
+   "id": "TJ-18",
+   "name": "ふじみ野",
+   "name_en": "Fujimino",
+   "line": "tojo",
+   "lat": 35.860857,
+   "lon": 139.523138
+  },
+  {
+   "id": "TJ-21",
+   "name": "川越",
+   "name_en": "Kawagoe",
+   "line": "tojo",
+   "lat": 35.906944,
+   "lon": 139.482778
+  },
+  {
+   "id": "TJ-22",
+   "name": "川越市",
+   "name_en": "Kawagoeshi",
+   "line": "tojo",
+   "lat": 35.913945,
+   "lon": 139.477235
+  },
+  {
+   "id": "TJ-24",
+   "name": "鶴ヶ島",
+   "name_en": "Tsurugashima",
+   "line": "tojo",
+   "lat": 35.9367,
+   "lon": 139.424
+  },
+  {
+   "id": "TJ-29",
+   "name": "東松山",
+   "name_en": "Higashi-Matsuyama",
+   "line": "tojo",
+   "lat": 36.034909,
+   "lon": 139.401658
+  },
+  {
+   "id": "TJ-31",
+   "name": "つきのわ",
+   "name_en": "Tsukinowa",
+   "line": "tojo",
+   "lat": 36.0434,
+   "lon": 139.346
+  },
+  {
+   "id": "TJ-32",
+   "name": "武蔵嵐山",
+   "name_en": "Musashi-Ranzan",
+   "line": "tojo",
+   "lat": 36.0437,
+   "lon": 139.3275
+  },
+  {
+   "id": "TJ-33",
+   "name": "小川町",
+   "name_en": "Ogawamachi",
+   "line": "tojo",
+   "lat": 36.058892,
+   "lon": 139.260807
+  },
+  {
+   "id": "TJ-34",
+   "name": "東武竹沢",
+   "name_en": "Tōbu-Takezawa",
+   "line": "tojo",
+   "lat": 36.0755,
+   "lon": 139.238
+  },
+  {
+   "id": "TJ-35",
+   "name": "みなみ寄居",
+   "name_en": "Minami-Yorii",
+   "line": "tojo",
+   "lat": 36.092436,
+   "lon": 139.236514
+  },
+  {
+   "id": "TJ-39",
+   "name": "寄居",
+   "name_en": "Yorii",
+   "line": "tojo",
+   "lat": 36.117881,
+   "lon": 139.194506
+  },
+  {
+   "id": "TJ-41",
+   "name": "一本松",
+   "name_en": "Ippommatsu",
+   "line": "ogose",
+   "lat": 35.940278,
+   "lon": 139.370278
+  },
+  {
+   "id": "TJ-43",
+   "name": "川角",
+   "name_en": "Kawakado",
+   "line": "ogose",
+   "lat": 35.9377,
+   "lon": 139.3465
+  },
+  {
+   "id": "TJ-47",
+   "name": "越生",
+   "name_en": "Ogose",
+   "line": "ogose",
+   "lat": 35.9627,
+   "lon": 139.2994
+  },
+  {
+   "id": "TD-04",
+   "name": "大和田",
+   "name_en": "Ōwada",
+   "line": "urban_park",
+   "lat": 35.929342,
+   "lon": 139.65045
+  },
+  {
+   "id": "TD-06",
+   "name": "岩槻",
+   "name_en": "Iwatsuki",
+   "line": "urban_park",
+   "lat": 35.95005,
+   "lon": 139.692917
+  },
+  {
+   "id": "TD-07",
+   "name": "東岩槻",
+   "name_en": "Higashi-iwatsuki",
+   "line": "urban_park",
+   "lat": 35.963361,
+   "lon": 139.712367
+  },
+  {
+   "id": "TD-13",
+   "name": "川間",
+   "name_en": "Kawama",
+   "line": "urban_park",
+   "lat": 35.979167,
+   "lon": 139.833861
+  },
+  {
+   "id": "TD-17",
+   "name": "野田市",
+   "name_en": "Nodashi",
+   "line": "urban_park",
+   "lat": 35.943389,
+   "lon": 139.870778
+  },
+  {
+   "id": "TD-20",
+   "name": "江戸川台",
+   "name_en": "Edogawadai",
+   "line": "urban_park",
+   "lat": 35.8975,
+   "lon": 139.910083
+  },
+  {
+   "id": "TD-21",
+   "name": "初石",
+   "name_en": "Hatsuishi",
+   "line": "urban_park",
+   "lat": 35.884083,
+   "lon": 139.917583
+  },
+  {
+   "id": "TD-22",
+   "name": "流山おおたかの森",
+   "name_en": "Nagareyama-ōtakanomori",
+   "line": "urban_park",
+   "lat": 35.871778,
+   "lon": 139.925
+  },
+  {
+   "id": "TD-29",
+   "name": "六実",
+   "name_en": "Mutsumi",
+   "line": "urban_park",
+   "lat": 35.793694,
+   "lon": 139.999167
+  },
+  {
+   "id": "TD-33",
+   "name": "塚田",
+   "name_en": "Tsukada",
+   "line": "urban_park",
+   "lat": 35.722,
+   "lon": 139.982806
+  }
+ ]
+}
