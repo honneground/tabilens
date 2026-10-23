@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { config, isLive } from './config.js';
 import { planTrip, confirmPending } from './orchestrator.js';
 import { redpine } from './redpine.js';
+import { wikiExplore, wikiNearby, placeQueries } from './wikipedia.js';
 
 const app = express();
 app.use(cors());
@@ -31,6 +32,36 @@ app.post('/api/plan', async (req, res) => {
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+// Topic explorer (Wikipedia): ?title=Lake Chūzenji, or ?name=<spot name>&area=<spot area> to find one.
+// Optional ?lat=&lng= searches "nearby" around that point instead of the article's own coordinates.
+app.get('/api/explore', async (req, res) => {
+  const { title, name, area } = req.query;
+  const queries = placeQueries({ name, area });
+  if (!title && !queries.length) return res.status(400).json({ error: 'title or name is required' });
+  try {
+    const lat = Number(req.query.lat);
+    const lng = Number(req.query.lng);
+    const near = Number.isFinite(lat) && Number.isFinite(lng) && req.query.lat ? { lat, lng } : undefined;
+    const node = await wikiExplore({ title, queries, near });
+    if (!node) return res.status(404).json({ error: 'No Wikipedia article found' });
+    res.json(node);
+  } catch (e) {
+    res.status(502).json({ error: String(e.message || e) });
+  }
+});
+
+// Articles near a point, e.g. the traveler's current location.
+app.get('/api/nearby', async (req, res) => {
+  const lat = Number(req.query.lat);
+  const lng = Number(req.query.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return res.status(400).json({ error: 'lat and lng are required' });
+  try {
+    res.json({ nearby: await wikiNearby({ lat, lng }) });
+  } catch (e) {
+    res.status(502).json({ error: String(e.message || e) });
   }
 });
 

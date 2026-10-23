@@ -29,7 +29,8 @@ export default function MapView({ places = [] }) {
     (async () => {
       try {
         await loadGoogleMaps(API_KEY);
-        const { Map, Polyline, LatLngBounds } = await google.maps.importLibrary('maps');
+        const { Map, Polyline } = await google.maps.importLibrary('maps');
+        const { LatLngBounds } = await google.maps.importLibrary('core');
         const { AdvancedMarkerElement, PinElement } = await google.maps.importLibrary('marker');
         const { Geocoder } = await google.maps.importLibrary('geocoding');
         if (cancelled) return;
@@ -192,7 +193,8 @@ async function resolveCoords(places, geocoder) {
   );
 }
 
-function buildDirectionsUrl(places) {
+// Universal Maps URL — works without an API key and opens the app on phones.
+export function buildDirectionsUrl(places) {
   const pts = places.filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
   if (pts.length < 2) return null;
   const fmt = (p) => `${p.lat},${p.lng}`;

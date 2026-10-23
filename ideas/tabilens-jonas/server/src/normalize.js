@@ -117,3 +117,17 @@ export function audioFrom(payload, rideMinutes) {
     rideMinutes,
   };
 }
+
+// Open-Meteo daily forecast → one row per day.
+export function weatherFrom(payload) {
+  const d = payload?.daily;
+  if (!d?.time?.length) return null;
+  return {
+    source: 'Open-Meteo',
+    days: d.time.map((date, i) => ({
+      date,
+      maxC: d.temperature_2m_max?.[i] ?? null,
+      rainPct: d.precipitation_probability_max?.[i] ?? null,
+    })),
+  };
+}

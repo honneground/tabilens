@@ -3,25 +3,36 @@ import { api } from './api.js';
 import QueryInput from './components/QueryInput.jsx';
 import SpotCard from './components/SpotCard.jsx';
 import TimetableWidget from './components/TimetableWidget.jsx';
-import AudioPlayer from './components/AudioPlayer.jsx';
-import PipelineTrace from './components/PipelineTrace.jsx';
 import MapView from './components/MapView.jsx';
+import WeatherCard from './components/WeatherCard.jsx';
+import HistoryCard from './components/HistoryCard.jsx';
+import ExplorePanel from './components/ExplorePanel.jsx';
+import ItineraryPanel from './components/ItineraryPanel.jsx';
 
 export default function App() {
   const [health, setHealth] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [plan, setPlan] = useState(null);
+  const [saved, setSaved] = useState([]); // Wikipedia topics saved in step 1, for the step 2 document
+
+  const toggleSaved = (topic) =>
+    setSaved((list) =>
+      list.some((s) => s.title === topic.title)
+        ? list.filter((s) => s.title !== topic.title)
+        : [...list, { title: topic.title, summary: topic.summary, url: topic.url }]
+    );
 
   useEffect(() => {
     api.health().then(setHealth).catch(() => setHealth({ ok: false }));
   }, []);
 
-  async function run(query, origin) {
+  async function run(query, origin, tripDate) {
     setLoading(true);
     setError(null);
     try {
-      setPlan(await api.plan(query, origin));
+      setPlan({ ...(await api.plan(query, origin)), tripDate });
+      setSaved([]);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -52,12 +63,16 @@ export default function App() {
           <div className="mt-8 grid gap-6 lg:grid-cols-5">
             <div className="space-y-6 lg:col-span-3">
               <SpotCard spot={plan.spot} />
+              <HistoryCard history={plan.spot?.history} place={plan.spot?.area} />
               <MapView places={plan.places} />
             </div>
             <div className="space-y-6 lg:col-span-2">
+              <WeatherCard weather={plan.weather} tripDate={plan.tripDate} />
               <TimetableWidget transit={plan.transit} />
-              <AudioPlayer audio={plan.audio} />
-              <PipelineTrace trace={plan.trace} billing={plan.billing} mode={plan.mode} />
+            </div>
+            <div className="space-y-6 lg:col-span-5">
+              <ExplorePanel spot={plan.spot} places={plan.places} saved={saved} onToggleSave={toggleSaved} />
+              <ItineraryPanel plan={plan} saved={saved} onRemoveSaved={toggleSaved} />
             </div>
           </div>
         )}

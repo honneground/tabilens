@@ -7,6 +7,7 @@ import { redpine, previewThenConfirm } from './redpine.js';
 import { parseIntent } from './intent.js';
 import { mockItinerary } from './mock.js';
 import * as norm from './normalize.js';
+import { wikiSummary, placeQueries } from './wikipedia.js';
 
 async function timed(trace, step, fn) {
   const t0 = Date.now();
@@ -21,7 +22,10 @@ async function timed(trace, step, fn) {
 }
 
 export async function planTrip({ query, origin = 'Asakusa' }) {
-  if (!isLive()) return mockItinerary({ query, origin });
+  if (!isLive()) {
+    const mock = mockItinerary({ query, origin });
+    return withWeather(mock, mock.trace);
+  }
 
   const trace = [];
   const billing = { spentUsd: 0, items: [], pending: [] };
@@ -81,7 +85,29 @@ export async function planTrip({ query, origin = 'Asakusa' }) {
     spotRaw: spotRes?.unlocked ?? spotRes?.preview,
   });
 
-  return { mode: 'live', query, origin, intent, spot, transit, places, audio, billing, trace };
+  // ---- 4. History: Wikipedia summary when the editorial spot has none ----------
+  if (spot && !spot.history) {
+    spot.history = await timed(trace, 'wikipedia.summary', () => wikiSummary(placeQueries(spot)));
+  }
+
+  return withWeather({ mode: 'live', query, origin, intent, spot, transit, places, audio, billing, trace }, trace);
+}
+
+// ---- 5. Weather at the destination (Open-Meteo is free, so mock mode uses it too) ----
+async function withWeather(existing, trace) {
+  const pin = existing.places?.find((p) => p.kind === 'spot' && p.lat != null)
+    ?? existing.places?.find((p) => p.kind === 'station' && p.lat != null);
+  if (!pin) return { ...existing, weather: null };
+  const { lat, lng } = pin;
+
+  const weatherRaw = await timed(trace, 'weather.forecast', () =>
+    // Redpine tool:  redpine.callTool(config.tools.weather, { lat, lng })
+    // Outside API:
+    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&daily=temperature_2m_max,precipitation_probability_max&forecast_days=16&timezone=Asia/Tokyo`)
+      .then((r) => r.json())
+  );
+  const weather = norm.weatherFrom(weatherRaw);
+  return { ...existing, weather };
 }
 
 function trackBilling(billing, label, res) {

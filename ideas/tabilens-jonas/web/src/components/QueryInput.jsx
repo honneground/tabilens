@@ -7,13 +7,17 @@ const EXAMPLES = [
   'Riverside cycling along Arakawa',
 ];
 
+// Today's date in Japan as YYYY-MM-DD (sv-SE formats dates that way).
+const todayInTokyo = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
+
 export default function QueryInput({ onSubmit, loading }) {
   const [query, setQuery] = useState(EXAMPLES[0]);
   const [origin, setOrigin] = useState(ORIGINS[0]);
+  const [date, setDate] = useState(todayInTokyo);
 
   const submit = (e) => {
     e.preventDefault();
-    if (query.trim()) onSubmit(query.trim(), origin);
+    if (query.trim()) onSubmit(query.trim(), origin, date);
   };
 
   return (
@@ -36,6 +40,14 @@ export default function QueryInput({ onSubmit, loading }) {
             <option key={o}>{o}</option>
           ))}
         </select>
+        <input
+          type="date"
+          value={date}
+          min={todayInTokyo()}
+          onChange={(e) => setDate(e.target.value)}
+          className="rounded-xl border border-line bg-white px-3 py-3"
+          aria-label="Trip date"
+        />
         <button
           disabled={loading}
           className="rounded-xl bg-moss px-6 py-3 font-medium text-white transition hover:bg-moss-dark disabled:opacity-50"

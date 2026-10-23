@@ -1,4 +1,23 @@
+import { useEffect, useState } from 'react';
+import { findPlacePhoto } from '../lib/placePhoto.js';
+
 export default function SpotCard({ spot }) {
+  const [googlePhoto, setGooglePhoto] = useState(null);
+  const hasFigure = Boolean(spot?.figures?.[0]?.url);
+
+  // No editorial photo → fall back to a Google Places photo of the destination.
+  useEffect(() => {
+    setGooglePhoto(null);
+    if (!spot || hasFigure) return;
+    let cancelled = false;
+    findPlacePhoto([spot.name, spot.area].filter(Boolean).join(', '))
+      .then((p) => !cancelled && setGooglePhoto(p))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [spot?.name, spot?.area, hasFigure]);
+
   if (!spot) {
     return (
       <div className="rounded-2xl border border-line bg-white p-6 text-ink/60">
@@ -6,7 +25,7 @@ export default function SpotCard({ spot }) {
       </div>
     );
   }
-  const fig = spot.figures?.[0];
+  const fig = hasFigure ? spot.figures[0] : googlePhoto;
   const c = spot.citation || {};
 
   return (
@@ -15,7 +34,19 @@ export default function SpotCard({ spot }) {
         <figure className="relative">
           <img src={fig.url} alt={fig.caption || spot.name} className="aspect-[16/10] w-full object-cover" />
           <figcaption className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-4 pb-3 pt-8 text-xs text-white/90">
-            {fig.caption} {fig.credit && <span className="opacity-70">· Photo: {fig.credit}</span>}
+            {fig.caption}{' '}
+            {fig.credit && (
+              <span className="opacity-70">
+                · Photo:{' '}
+                {fig.creditUrl ? (
+                  <a href={fig.creditUrl} target="_blank" rel="noreferrer" className="underline">
+                    {fig.credit}
+                  </a>
+                ) : (
+                  fig.credit
+                )}
+              </span>
+            )}
           </figcaption>
         </figure>
       )}
