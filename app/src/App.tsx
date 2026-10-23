@@ -5,7 +5,10 @@ import stationData from './data/stations.json'
 import { PlanPanel } from './PlanPanel'
 import { Reader, RunResults } from './Results'
 import { KIND_EMOJI, SpotCard } from './SpotCard'
-import { issueLabel, load, save, type ArticleCard, type LockedCard, type PlanItem, type Run, type SearchEntry, type Spot } from './types'
+import { load, save, type ArticleCard, type LockedCard, type PlanItem, type Run, type SearchEntry, type Spot } from './types'
+
+import { cachedSearch, completedSearches } from './searchHistory'
+import { articleItem, spotItem, placeItem, FIRST_DAY } from './trip'
 
 type Station = (typeof stationData.stations)[number]
 type LatLng = { lat: number; lon: number }
@@ -36,7 +39,7 @@ const BASEMAPS = {
   gsi: {
     label: 'Topo',
     url: 'https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',
-    attribution: '<a href="https://maps.gsi.go.jp/development/ichiran.html">国土地理院</a>',
+    attribution: '<a href="https://maps.gsi.go.jp/development/ichiran.html">Geospatial Information Authority of Japan</a>',
   },
 } as const
 
@@ -122,16 +125,30 @@ export default function App() {
   const [selected, setSelected] = useState<Station | null>(null)
   const [flyTarget, setFlyTarget] = useState<LatLng | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
-  const [runs, setRuns] = useState<Run[]>([])
+  const [runs, setRuns] = useState<Run[]>(() => completedSearches(load<Run[]>('tabilens.runs', [])))
   const [activeSpot, setActiveSpot] = useState<Spot | null>(null)
   const [reading, setReading] = useState<{ article: ArticleCard; runId: string } | null>(null)
   const [plan, setPlan] = useState<PlanItem[]>(() => load('tabilens.plan', []))
   const [searches, setSearches] = useState<SearchEntry[]>(() => load('tabilens.searches', []))
 
+  const [days, setDays] = useState<string[]>(() => [...new Set([FIRST_DAY, ...load<string[]>('tabilens.days', []), ...plan.map((i) => i.dayId ?? FIRST_DAY)])])
+  const [activeDay, setActiveDay] = useState(FIRST_DAY)
+  const [storageWarning, setStorageWarning] = useState(false)
+
   useEffect(() => save('tabilens.plan', plan), [plan])
+  useEffect(() => save('tabilens.days', days), [days])
+  useEffect(() => {
+    const completed = completedSearches(runs)
+    try {
+      localStorage.setItem('tabilens.runs', JSON.stringify(completed))
+      setStorageWarning(false)
+    } catch {
+      setStorageWarning(true)
+    }
+  }, [runs])
   useEffect(() => save('tabilens.searches', searches), [searches])
 
-  const researching = runs.length > 0 || plan.length > 0
+  const researching = runs.length > 0 || plan.length > 0 || searches.length > 0
   const latest = runs[0]
   const busy = Boolean(latest && !latest.done && !latest.error)
   const allSpots = useMemo(() => runs.flatMap((r) => r.spots), [runs])
@@ -169,11 +186,19 @@ export default function App() {
     setFlyTarget({ lat: s.lat, lon: s.lon })
   }
 
-  async function explore(text = [interest, query].filter(Boolean).join(' ')) {
+  async function explore(text = [interest, query].filter(Boolean).join(' '), refresh = false) {
     if (!text.trim() || busy) return
+    const cached = cachedSearch(runs, text)
+    if (cached && !refresh) {
+      setRuns((rs) => [cached, ...rs.filter((r) => r.id !== cached.id)])
+      setActiveSpot(null)
+      setReading(null)
+      setNotice('Loaded saved results. No new search or unlock was made. Timetables may need checking.')
+      return
+    }
     const id = newId()
     setRuns((rs) => [{ id, query: text, status: 'Starting', done: false, spent: 0, articles: [], spots: [], locked: [] }, ...rs])
-    setSearches((s) => [{ id, text, at: Date.now() }, ...s.filter((e) => e.text !== text)])
+    setSearches((s) => [{ id, text, at: Date.now() }, ...s.filter((e) => e.text !== text)].slice(0, 50))
     setActiveSpot(null)
     setSelected(null)
     setPin(null)
@@ -197,6 +222,9 @@ export default function App() {
         buffer = lines.pop() ?? ''
         for (const line of lines.filter(Boolean)) handle(id, JSON.parse(line))
       }
+      buffer += decoder.decode()
+      if (buffer.trim()) handle(id, JSON.parse(buffer))
+      updateRun(id, (r) => r.done || r.error ? {} : { error: 'The search ended before results were complete. Please try again.' })
     } catch (err) {
       updateRun(id, () => ({ error: String(err) }))
     }
@@ -242,16 +270,19 @@ export default function App() {
     }))
   }
 
+  function dropItem(id: string, dayId: string, beforeId?: string) {
+    const item = plan.find((i) => i.id === id)
+      ?? runs.flatMap((r) => [...r.spots.map(spotItem), ...r.articles.map(articleItem)]).find((i) => i.id === id)
+    if (!item || !days.includes(dayId)) return
+    setPlan((p) => placeItem(p, item, dayId, beforeId))
+  }
+
   function addArticle(a: ArticleCard) {
-    const id = `article:${a.id}`
-    if (planned.has(id)) return
-    setPlan((p) => [...p, { id, kind: 'article', title: a.headline_en, subtitle: issueLabel(a), photo: a.photos[0], note: '', article: a }])
+    if (!planned.has(`article:${a.id}`)) setPlan((p) => placeItem(p, articleItem(a), activeDay))
   }
 
   function addSpot(s: Spot) {
-    const id = `spot:${s.name_ja}`
-    if (planned.has(id)) return
-    setPlan((p) => [...p, { id, kind: 'spot', title: s.name_en, subtitle: `${s.name_ja} · ${s.area_ja}`, photo: s.photos[0], note: '', spot: s }])
+    if (!planned.has(`spot:${s.name_ja}`)) setPlan((p) => placeItem(p, spotItem(s), activeDay))
   }
 
   const nearby = pin ? nearestStations(pin) : []
@@ -261,7 +292,7 @@ export default function App() {
   const searchBox = (
     <div className="pointer-events-auto rounded-2xl bg-white/95 p-3 shadow-lg backdrop-blur">
       <span className="text-lg font-semibold tracking-tight">
-        TabiLens <span className="text-gray-400">旅レンズ</span>
+        TabiLens
       </span>
       <form
         className="mt-2 flex gap-2"
@@ -450,13 +481,33 @@ export default function App() {
 
       <PlanPanel
         items={plan}
+        days={days}
+        activeDay={activeDay}
+        onSelectDay={setActiveDay}
+        onAddDay={(afterId) => {
+          if (days.length >= 14) return
+          const id = `day-${newId()}`
+          setDays((d) => { const next = [...d]; next.splice(afterId ? d.indexOf(afterId) + 1 : d.length, 0, id); return next })
+          setActiveDay(id)
+        }}
+        onRemoveDay={(id) => { setDays((d) => d.filter((day) => day !== id)); if (activeDay === id) setActiveDay(FIRST_DAY) }}
+        onDropItem={dropItem}
+        cachedSearches={new Set(searches.filter((s) => runs.some((r) => r.query.trim() === s.text.trim() && r.done && !r.error)).map((s) => s.id))}
+        busy={busy}
+        storageWarning={storageWarning}
         onUpdate={(id, note) => setPlan((p) => p.map((i) => (i.id === id ? { ...i, note } : i)))}
         onRemove={(id) => setPlan((p) => p.filter((i) => i.id !== id))}
         onShowSpot={showSpot}
         searches={searches}
         onEditSearch={(id, text) => setSearches((s) => s.map((e) => (e.id === id ? { ...e, text } : e)))}
-        onDeleteSearch={(id) => setSearches((s) => s.filter((e) => e.id !== id))}
+        onDeleteSearch={(id) => {
+          const entry = searches.find((s) => s.id === id)
+          setSearches((s) => s.filter((e) => e.id !== id))
+          if (entry) setRuns((rs) => rs.filter((r) => r.query.trim() !== entry.text.trim() || !r.done))
+          setReading(null)
+        }}
         onRunSearch={(text) => void explore(text)}
+        onRefreshSearch={(text) => void explore(text, true)}
         onCombine={(texts) => setQuery(texts.length === 1 ? texts[0] : texts.join('. Also: '))}
       />
 

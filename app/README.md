@@ -32,6 +32,15 @@ Redpine results, geocodes and photos are cached in `.cache/` (gitignored, licens
 
 ## Layout
 
+### Search history and trip planning
+
+- Completed search results are stored in this browser, with up to 12 distinct queries retained. Click a search in **My searches** to restore its available results without another MCP request. The refresh arrow explicitly starts a new search and may spend credits. Older history entries without a saved result require a search first.
+- Search history and results are local to the browser and origin. Storage failures show a warning. Figure URLs still depend on the local backend and its figure cache.
+- Drag an article card or a place chip into **My trip**. Drag a planned card onto another card to insert before it, or onto a day's background to append. The day selector and arrow buttons provide alternatives to dragging.
+- Select a day to choose where the + buttons add cards. Insert an empty day after any day for a day gap, or append a day. Trips support up to 14 days; existing cards are restored into Day 1.
+- Each day provides Google Maps links for places with coordinates. Article-only cards are excluded. Routes are split into mobile-compatible segments; transit uses individual legs. Links open directions and do not save a multi-day trip to a Google account.
+- Run the planning and history checks with `node --test tests/planning.test.mjs`. These checks do not call Redpine or spend credits.
+
 - `src/App.tsx` map, search panel, bottom sheet
 - `src/SpotCard.tsx` spot details and train times
 - `server/index.ts` HTTP API: `POST /api/explore` (NDJSON progress stream), `GET /api/trains`, `GET /api/figures/:name`

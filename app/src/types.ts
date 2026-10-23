@@ -54,6 +54,7 @@ export interface PlanItem {
   note: string
   spot?: Spot
   article?: ArticleCard
+  dayId?: string
 }
 
 export interface SearchEntry {

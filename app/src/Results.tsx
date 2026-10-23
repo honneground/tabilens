@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { TRIP_DRAG_TYPE } from './trip'
 import { KIND_EMOJI } from './SpotCard'
 import { issueLabel, usd, type ArticleCard, type LockedCard, type Run, type Spot } from './types'
 
@@ -33,7 +34,7 @@ interface CardsProps {
 function Article({ a, run, onSpot, onRead, onAddArticle, onAddSpot, planned }: Omit<CardsProps, 'onUnlock'> & { a: ArticleCard }) {
   const spots = run.spots.filter((s) => s.articleId === a.id)
   return (
-    <article className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+    <article draggable onDragStart={(e) => { e.dataTransfer.setData(TRIP_DRAG_TYPE, `article:${a.id}`); e.dataTransfer.effectAllowed = 'copy' }} className="cursor-grab overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm" aria-label={`Drag ${a.headline_en} to your trip`}>
       {a.photos[0] && (
         <button onClick={() => onRead(a)} className="block w-full">
           <img src={a.photos[0]} alt={a.headline_en} className="h-48 w-full object-cover" />
@@ -47,7 +48,7 @@ function Article({ a, run, onSpot, onRead, onAddArticle, onAddSpot, planned }: O
         {spots.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-1.5">
             {spots.map((s) => (
-              <span key={s.name_ja} className="inline-flex items-center overflow-hidden rounded-full border border-gray-200 text-xs">
+              <span key={s.name_ja} draggable onDragStart={(e) => { e.stopPropagation(); e.dataTransfer.setData(TRIP_DRAG_TYPE, `spot:${s.name_ja}`); e.dataTransfer.effectAllowed = 'copy' }} className="inline-flex items-center overflow-hidden rounded-full border border-gray-200 text-xs">
                 <button onClick={() => onSpot(s)} className="px-2 py-1 hover:bg-gray-50" title="Show on map">
                   {KIND_EMOJI[s.kind]} {s.name_en}
                 </button>
