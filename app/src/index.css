@@ -52,6 +52,16 @@ html[data-theme="dark"] .brand-surface {
   border-color: #8c9daa;
 }
 
+html[data-theme="dark"] [class~="bg-amber-50"] {
+  background-color: #302a20;
+  color: #e5c68f;
+  border: 1px solid #514533;
+}
+
+html[data-theme="dark"] [class~="bg-amber-50"] [class~="text-amber-700"] {
+  color: #e5c68f;
+}
+
 html[data-theme="dark"] :is([class~="bg-white"], [class~="bg-white/95"], [class~="bg-white/90"], [class~="bg-white/60"]):not(.brand-surface) {
   background-color: #202b38;
   color: #e5ecf3;
