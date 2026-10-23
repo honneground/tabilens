@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
-const REDPINE_URL = process.env.REDPINE_MCP_URL ?? 'https://api.redpine.ai'
+const REDPINE_URL = process.env.REDPINE_MCP_URL ?? 'https://api.redpine.ai/mcp'
 export const CACHE_DIR = path.join(process.cwd(), '.cache')
 
 /** An ADDIX search hit from a free preview. */
@@ -62,9 +62,10 @@ function parseJson(result: ToolResult): any {
   for (const block of result.content ?? []) {
     if (block.type !== 'text' || !block.text) continue
     const start = block.text.indexOf('{')
-    if (start === -1) continue
+    const end = block.text.lastIndexOf('}')
+    if (start === -1 || end === -1 || end <= start) continue
     try {
-      return JSON.parse(block.text.slice(start))
+      return JSON.parse(block.text.slice(start, end + 1))
     } catch {
       // not the JSON block, keep looking
     }
