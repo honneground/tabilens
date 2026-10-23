@@ -1,8 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { CircleMarker, MapContainer, Marker, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import stationData from './data/stations.json'
-import { KIND_EMOJI, SpotCard, type Spot } from './SpotCard'
+import { PlanPanel } from './PlanPanel'
+import { Reader, RunResults } from './Results'
+import { KIND_EMOJI, SpotCard } from './SpotCard'
+import { issueLabel, load, save, type ArticleCard, type LockedCard, type PlanItem, type Run, type SearchEntry, type Spot } from './types'
 
 type Station = (typeof stationData.stations)[number]
 type LatLng = { lat: number; lon: number }
@@ -53,6 +56,14 @@ const youIcon = L.divIcon({
   iconAnchor: [8, 8],
 })
 
+const spotIcon = (kind: string, active: boolean) =>
+  L.divIcon({
+    className: '',
+    html: `<div style="display:flex;align-items:center;justify-content:center;width:${active ? 40 : 32}px;height:${active ? 40 : 32}px;border-radius:50%;background:white;border:2px solid ${active ? '#c8102e' : '#1c1a17'};box-shadow:0 2px 6px rgba(0,0,0,.35);font-size:${active ? 20 : 16}px">${KIND_EMOJI[kind] ?? '📍'}</div>`,
+    iconSize: [active ? 40 : 32, active ? 40 : 32],
+    iconAnchor: [active ? 20 : 16, active ? 20 : 16],
+  })
+
 function distanceKm(a: LatLng, b: LatLng) {
   const rad = Math.PI / 180
   const dLat = (b.lat - a.lat) * rad
@@ -72,14 +83,6 @@ function ClickHandler({ onPick }: { onPick: (p: LatLng) => void }) {
   return null
 }
 
-const spotIcon = (kind: string, active: boolean) =>
-  L.divIcon({
-    className: '',
-    html: `<div style="display:flex;align-items:center;justify-content:center;width:${active ? 40 : 32}px;height:${active ? 40 : 32}px;border-radius:50%;background:white;border:2px solid ${active ? '#c8102e' : '#1c1a17'};box-shadow:0 2px 6px rgba(0,0,0,.35);font-size:${active ? 20 : 16}px">${KIND_EMOJI[kind] ?? '📍'}</div>`,
-    iconSize: [active ? 40 : 32, active ? 40 : 32],
-    iconAnchor: [active ? 20 : 16, active ? 20 : 16],
-  })
-
 function FitSpots({ spots }: { spots: Spot[] }) {
   const map = useMap()
   useEffect(() => {
@@ -89,16 +92,6 @@ function FitSpots({ spots }: { spots: Spot[] }) {
   return null
 }
 
-interface Progress {
-  status: string
-  queries?: string[]
-  previewed?: { found: number; picked: number; estimate: number }
-  unlocked?: { charged: number; balance?: number }
-  error?: string
-}
-
-const usd = (n: number) => `$${n.toFixed(2)}`
-
 function FlyTo({ target }: { target: LatLng | null }) {
   const map = useMap()
   useEffect(() => {
@@ -106,6 +99,19 @@ function FlyTo({ target }: { target: LatLng | null }) {
   }, [map, target])
   return null
 }
+
+// Leaflet must be told when its container changes size (the layout grows into columns).
+function ResizeWatcher() {
+  const map = useMap()
+  useEffect(() => {
+    const observer = new ResizeObserver(() => map.invalidateSize())
+    observer.observe(map.getContainer())
+    return () => observer.disconnect()
+  }, [map])
+  return null
+}
+
+const newId = () => Math.random().toString(36).slice(2, 10)
 
 export default function App() {
   const [basemap, setBasemap] = useState<keyof typeof BASEMAPS>('osm')
@@ -116,10 +122,24 @@ export default function App() {
   const [selected, setSelected] = useState<Station | null>(null)
   const [flyTarget, setFlyTarget] = useState<LatLng | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
-  const [spots, setSpots] = useState<Spot[]>([])
+  const [runs, setRuns] = useState<Run[]>([])
   const [activeSpot, setActiveSpot] = useState<Spot | null>(null)
-  const [progress, setProgress] = useState<Progress | null>(null)
-  const busy = Boolean(progress && !progress.error && progress.status !== 'Done')
+  const [reading, setReading] = useState<{ article: ArticleCard; runId: string } | null>(null)
+  const [plan, setPlan] = useState<PlanItem[]>(() => load('tabilens.plan', []))
+  const [searches, setSearches] = useState<SearchEntry[]>(() => load('tabilens.searches', []))
+
+  useEffect(() => save('tabilens.plan', plan), [plan])
+  useEffect(() => save('tabilens.searches', searches), [searches])
+
+  const researching = runs.length > 0 || plan.length > 0
+  const latest = runs[0]
+  const busy = Boolean(latest && !latest.done && !latest.error)
+  const allSpots = useMemo(() => runs.flatMap((r) => r.spots), [runs])
+  const latestSpots = useMemo(() => latest?.spots ?? [], [latest])
+  const planned = useMemo(() => new Set(plan.map((p) => p.id)), [plan])
+
+  const updateRun = (id: string, patch: (r: Run) => Partial<Run>) =>
+    setRuns((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch(r) } : r)))
 
   function locate() {
     if (!navigator.geolocation) return setNotice('Location is not available in this browser.')
@@ -142,19 +162,28 @@ export default function App() {
     setFlyTarget(null)
   }
 
-  async function explore() {
-    if (!query.trim() && !interest) return
-    setSpots([])
+  function showSpot(s: Spot) {
+    setActiveSpot(s)
+    setSelected(null)
+    setPin(null)
+    setFlyTarget({ lat: s.lat, lon: s.lon })
+  }
+
+  async function explore(text = [interest, query].filter(Boolean).join(' ')) {
+    if (!text.trim() || busy) return
+    const id = newId()
+    setRuns((rs) => [{ id, query: text, status: 'Starting', done: false, spent: 0, articles: [], spots: [], locked: [] }, ...rs])
+    setSearches((s) => [{ id, text, at: Date.now() }, ...s.filter((e) => e.text !== text)])
     setActiveSpot(null)
     setSelected(null)
     setPin(null)
-    setNotice(null)
-    setProgress({ status: 'Starting' })
+    setQuery('')
+    setInterest(null)
     try {
       const res = await fetch('/api/explore', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, interest }),
+        body: JSON.stringify({ query: text }),
       })
       if (!res.ok || !res.body) throw new Error(`Backend error ${res.status}. Is \`npm run server\` running?`)
       const reader = res.body.getReader()
@@ -166,42 +195,114 @@ export default function App() {
         buffer += decoder.decode(value, { stream: true })
         const lines = buffer.split('\n')
         buffer = lines.pop() ?? ''
-        for (const line of lines.filter(Boolean)) handle(JSON.parse(line))
+        for (const line of lines.filter(Boolean)) handle(id, JSON.parse(line))
       }
     } catch (err) {
-      setProgress((p) => ({ ...(p ?? { status: '' }), error: String(err) }))
+      updateRun(id, () => ({ error: String(err) }))
     }
   }
 
-  function handle(event: any) {
+  function handle(id: string, event: any) {
     switch (event.type) {
       case 'status':
-        return setProgress((p) => ({ ...p, status: event.message }))
+        return updateRun(id, () => ({ status: event.message }))
       case 'plan':
-        return setProgress((p) => ({ ...p, status: 'Searching the magazines', queries: event.queries }))
+        return updateRun(id, () => ({ status: 'Searching the magazines', queries: event.queries }))
       case 'previewed':
-        return setProgress((p) => ({ ...p!, previewed: event }))
+        return updateRun(id, () => ({ previewed: event }))
       case 'unlocked':
-        return setProgress((p) => ({ ...p!, unlocked: event }))
+        return updateRun(id, (r) => ({ spent: r.spent + event.charged, balance: event.balance }))
       case 'done':
-        setSpots(event.spots)
-        setProgress((p) => ({ ...p!, status: 'Done' }))
-        if (event.note || !event.spots.length) setNotice(event.note ?? 'No magazine spots found for this.')
-        return
+        return updateRun(id, () => ({
+          done: true,
+          articles: event.articles,
+          spots: event.spots,
+          locked: event.locked ?? [],
+          note: event.note,
+        }))
       case 'error':
-        return setProgress((p) => ({ ...p!, error: event.message }))
+        return updateRun(id, () => ({ error: event.message }))
     }
+  }
+
+  async function unlock(run: Run, hit: LockedCard) {
+    const res = await fetch('/api/unlock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ request: run.query, hit }),
+    })
+    const data = await res.json()
+    if (data.error) return updateRun(run.id, () => ({ error: data.error }))
+    updateRun(run.id, (r) => ({
+      articles: [...r.articles, ...data.articles.filter((a: ArticleCard) => !r.articles.some((x) => x.id === a.id))],
+      spots: [...r.spots, ...data.spots],
+      locked: r.locked.filter((l) => l.id !== hit.id),
+      spent: r.spent + (data.charged ?? 0),
+      balance: data.balance ?? r.balance,
+    }))
+  }
+
+  function addArticle(a: ArticleCard) {
+    const id = `article:${a.id}`
+    if (planned.has(id)) return
+    setPlan((p) => [...p, { id, kind: 'article', title: a.headline_en, subtitle: issueLabel(a), photo: a.photos[0], note: '', article: a }])
+  }
+
+  function addSpot(s: Spot) {
+    const id = `spot:${s.name_ja}`
+    if (planned.has(id)) return
+    setPlan((p) => [...p, { id, kind: 'spot', title: s.name_en, subtitle: `${s.name_ja} · ${s.area_ja}`, photo: s.photos[0], note: '', spot: s }])
   }
 
   const nearby = pin ? nearestStations(pin) : []
   const tiles = BASEMAPS[basemap]
+  const readingRun = reading ? runs.find((r) => r.id === reading.runId) : undefined
 
-  return (
+  const searchBox = (
+    <div className="pointer-events-auto rounded-2xl bg-white/95 p-3 shadow-lg backdrop-blur">
+      <span className="text-lg font-semibold tracking-tight">
+        TabiLens <span className="text-gray-400">旅レンズ</span>
+      </span>
+      <form
+        className="mt-2 flex gap-2"
+        onSubmit={(e) => {
+          e.preventDefault()
+          void explore()
+        }}
+      >
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Where do you want to escape to? e.g. easy lake walk with onsen"
+          className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-gray-400"
+        />
+        <button disabled={busy} className="rounded-xl bg-[#c8102e] px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+          {busy ? 'Exploring…' : 'Explore'}
+        </button>
+      </form>
+      <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+        {INTERESTS.map((i) => (
+          <button
+            key={i}
+            onClick={() => setInterest(interest === i ? null : i)}
+            className={`shrink-0 rounded-full border px-3 py-1 text-xs ${
+              interest === i ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 bg-white text-gray-700'
+            }`}
+          >
+            {i}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+
+  const map = (
     <div className="relative h-full w-full">
       <MapContainer center={[ASAKUSA.lat, ASAKUSA.lon]} zoom={9} zoomControl={false} className="h-full w-full">
         <TileLayer key={basemap} url={tiles.url} attribution={tiles.attribution} maxZoom={18} />
         <ClickHandler onPick={pick} />
         <FlyTo target={flyTarget} />
+        <ResizeWatcher />
 
         {STATIONS.map((s) => (
           <CircleMarker
@@ -213,6 +314,7 @@ export default function App() {
               click: (e) => {
                 L.DomEvent.stopPropagation(e)
                 setSelected(s)
+                setActiveSpot(null)
                 setPin(null)
               },
             }}
@@ -223,80 +325,33 @@ export default function App() {
           </CircleMarker>
         ))}
 
-        {spots.map((s, i) => (
+        {allSpots.map((s, i) => (
           <Marker
-            key={i}
+            key={`${s.name_ja}-${i}`}
             position={[s.lat, s.lon]}
             icon={spotIcon(s.kind, activeSpot === s)}
             zIndexOffset={1000}
-            eventHandlers={{
-              click: () => {
-                setActiveSpot(s)
-                setSelected(null)
-                setPin(null)
-              },
-            }}
+            eventHandlers={{ click: () => showSpot(s) }}
           >
             <Tooltip direction="top" offset={[0, -14]}>
               {s.name_en}
             </Tooltip>
           </Marker>
         ))}
-        <FitSpots spots={spots} />
+        <FitSpots spots={latestSpots} />
 
         {you && <Marker position={[you.lat, you.lon]} icon={youIcon} />}
         {pin && pin !== you && <Marker position={[pin.lat, pin.lon]} icon={pinIcon} />}
       </MapContainer>
 
-      {/* Search panel */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-[1000] p-3 sm:p-4">
-        <div className="pointer-events-auto mx-auto max-w-xl rounded-2xl bg-white/95 p-3 shadow-lg backdrop-blur">
-          <div className="flex items-center gap-2">
-            <span className="text-lg font-semibold tracking-tight">
-              TabiLens <span className="text-gray-400">旅レンズ</span>
-            </span>
-          </div>
-          <form
-            className="mt-2 flex gap-2"
-            onSubmit={(e) => {
-              e.preventDefault()
-              explore()
-            }}
-          >
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Where do you want to escape to? e.g. easy lake walk with onsen"
-              className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-gray-400"
-            />
-            <button disabled={busy} className="rounded-xl bg-[#c8102e] px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
-              {busy ? 'Exploring…' : 'Explore'}
-            </button>
-          </form>
-          <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
-            {INTERESTS.map((i) => (
-              <button
-                key={i}
-                onClick={() => setInterest(interest === i ? null : i)}
-                className={`shrink-0 rounded-full border px-3 py-1 text-xs ${
-                  interest === i ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 bg-white text-gray-700'
-                }`}
-              >
-                {i}
-              </button>
-            ))}
-          </div>
+      {!researching && (
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-[1000] p-4">
+          <div className="mx-auto max-w-xl">{searchBox}</div>
         </div>
-      </div>
+      )}
 
-      {/* Map controls */}
-      <div className="absolute right-3 bottom-40 z-[1000] flex flex-col gap-2 sm:bottom-6">
-        <button
-          onClick={locate}
-          className="h-11 w-11 rounded-full bg-white text-lg shadow-lg"
-          aria-label="Show my location"
-          title="Show my location"
-        >
+      <div className="absolute right-3 bottom-6 z-[1000] flex flex-col gap-2">
+        <button onClick={locate} className="h-11 w-11 rounded-full bg-white text-lg shadow-lg" aria-label="Show my location" title="Show my location">
           ◎
         </button>
         <button
@@ -308,9 +363,8 @@ export default function App() {
         </button>
       </div>
 
-      {/* Bottom sheet */}
-      {(selected || pin || notice || activeSpot || progress) && (
-        <div className="absolute inset-x-0 bottom-0 z-[1000] p-3 sm:left-4 sm:right-auto sm:bottom-6 sm:w-96 sm:p-0">
+      {(selected || pin || notice || activeSpot) && (
+        <div className="absolute bottom-6 left-4 z-[1000] w-96">
           <div className="rounded-2xl bg-white p-4 shadow-lg">
             {notice && (
               <div className="mb-3 flex items-start gap-2 rounded-lg bg-amber-50 p-2 text-sm text-amber-900">
@@ -318,43 +372,6 @@ export default function App() {
                 <button onClick={() => setNotice(null)} aria-label="Dismiss" className="text-amber-700">
                   ✕
                 </button>
-              </div>
-            )}
-
-            {progress && !activeSpot && (
-              <div className="mb-3 text-sm">
-                <p className="font-medium">
-                  {progress.status === 'Done' ? `${spots.length} magazine spots on the map` : progress.status}
-                  {busy && <span className="ml-1 animate-pulse">…</span>}
-                </p>
-                {progress.queries && <p className="mt-1 text-gray-500">Searched: {progress.queries.join(' · ')}</p>}
-                {progress.previewed && (
-                  <p className="mt-1 text-gray-600">
-                    Previewed {progress.previewed.found} pages for free, unlocked the best {progress.previewed.picked} for{' '}
-                    {usd(progress.previewed.estimate)}
-                    {progress.unlocked?.balance !== undefined && ` (balance ${usd(progress.unlocked.balance)})`}.
-                  </p>
-                )}
-                {progress.error && <p className="mt-1 text-red-700">{progress.error}</p>}
-                {progress.status === 'Done' && spots.length > 0 && (
-                  <ul className="mt-2 space-y-1">
-                    {spots.map((s, i) => (
-                      <li key={i}>
-                        <button
-                          onClick={() => {
-                            setActiveSpot(s)
-                            setFlyTarget({ lat: s.lat, lon: s.lon })
-                          }}
-                          className="flex w-full gap-2 rounded-lg px-2 py-1 text-left hover:bg-gray-50"
-                        >
-                          <span>{KIND_EMOJI[s.kind]}</span>
-                          <span className="flex-1">{s.name_en}</span>
-                          <span className="text-gray-500">{s.source.journal}</span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
               </div>
             )}
 
@@ -371,13 +388,10 @@ export default function App() {
                 <h2 className="mt-1 text-xl font-semibold">
                   {selected.name} <span className="text-base font-normal text-gray-500">{selected.name_en}</span>
                 </h2>
-                <p className="mt-2 text-sm text-gray-600">
-                  Next: magazine spots around this station and the next trains from Asakusa.
-                </p>
               </div>
             )}
 
-            {pin && !selected && (
+            {pin && !selected && !activeSpot && (
               <div>
                 <h2 className="text-sm font-semibold text-gray-500">{pin === you ? 'You are here' : 'Dropped pin'} · nearest Tobu stations</h2>
                 <ul className="mt-2 space-y-1">
@@ -403,6 +417,58 @@ export default function App() {
             )}
           </div>
         </div>
+      )}
+    </div>
+  )
+
+  if (!researching) return <div className="h-full w-full">{map}</div>
+
+  return (
+    <div className="grid h-full w-full grid-cols-[minmax(0,1fr)_440px_360px]">
+      <div className="flex min-h-0 flex-col">
+        <div className="z-[1001] p-3 pb-0">{searchBox}</div>
+        <div className="min-h-0 flex-1 p-3">
+          <div className="h-full overflow-hidden rounded-2xl shadow">{map}</div>
+        </div>
+      </div>
+
+      <main className="min-h-0 space-y-8 overflow-y-auto bg-[#faf8f4] p-4">
+        {runs.length === 0 && <p className="text-sm text-gray-500">Search to discover places from the magazines.</p>}
+        {runs.map((run) => (
+          <RunResults
+            key={run.id}
+            run={run}
+            onSpot={showSpot}
+            onRead={(article) => setReading({ article, runId: run.id })}
+            onAddArticle={addArticle}
+            onAddSpot={addSpot}
+            onUnlock={unlock}
+            planned={planned}
+          />
+        ))}
+      </main>
+
+      <PlanPanel
+        items={plan}
+        onUpdate={(id, note) => setPlan((p) => p.map((i) => (i.id === id ? { ...i, note } : i)))}
+        onRemove={(id) => setPlan((p) => p.filter((i) => i.id !== id))}
+        onShowSpot={showSpot}
+        searches={searches}
+        onEditSearch={(id, text) => setSearches((s) => s.map((e) => (e.id === id ? { ...e, text } : e)))}
+        onDeleteSearch={(id) => setSearches((s) => s.filter((e) => e.id !== id))}
+        onRunSearch={(text) => void explore(text)}
+        onCombine={(texts) => setQuery(texts.length === 1 ? texts[0] : texts.join('. Also: '))}
+      />
+
+      {reading && (
+        <Reader
+          article={reading.article}
+          run={readingRun}
+          onClose={() => setReading(null)}
+          onUnlock={unlock}
+          onAddArticle={addArticle}
+          planned={planned}
+        />
       )}
     </div>
   )

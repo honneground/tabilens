@@ -1,7 +1,7 @@
 import { createServer } from 'node:http'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
-import { explore } from './explore.ts'
+import { explore, moreFromIssue, unlockOne } from './explore.ts'
 import { LLM_BACKEND } from './llm.ts'
 import { CACHE_DIR, railDepartures } from './redpine.ts'
 
@@ -27,6 +27,19 @@ createServer(async (req, res) => {
         send({ type: 'error', message: err instanceof Error ? err.message : String(err) })
       }
       return res.end()
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/unlock') {
+      const { request = '', hit } = await readJson(req)
+      const data = await unlockOne(request, hit)
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      return res.end(JSON.stringify(data))
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/more') {
+      const { article } = await readJson(req)
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      return res.end(JSON.stringify({ locked: await moreFromIssue(article) }))
     }
 
     if (req.method === 'GET' && url.pathname === '/api/trains') {

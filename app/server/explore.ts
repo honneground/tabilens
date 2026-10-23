@@ -6,6 +6,7 @@ import { cached, previewAddix, unlockAddix, type Article, type Hit } from './red
 
 const UNLOCK_BUDGET_USD = 2.5
 const MAX_ARTICLES = 6
+const MAX_LOCKED = 8
 
 type Station = { id: string; name: string; name_en: string; line: string; lat: number; lon: number }
 const STATIONS: Station[] = JSON.parse(
@@ -21,7 +22,14 @@ const PlanSchema = z.object({
     .describe('2-3 short Japanese keyword searches for the ADDIX outdoor magazines, e.g. "日光 紅葉 ハイキング".'),
 })
 
-const SpotsSchema = z.object({
+const ReadSchema = z.object({
+  articles: z.array(
+    z.object({
+      source_id: z.string(),
+      headline_en: z.string().describe('A short, inviting English headline for this magazine page.'),
+      summary_en: z.string().describe('Two or three sentences in English on what the page says, for a curious traveller.'),
+    }),
+  ),
   spots: z.array(
     z.object({
       name_en: z.string(),
@@ -35,12 +43,12 @@ const SpotsSchema = z.object({
       quote_en: z.string(),
     }),
   ),
-  no_match_note: z
+  note: z
     .string()
     .nullable()
-    .describe('If the magazines do not really cover the request, say so plainly and what they offer instead.'),
+    .describe('One or two sentences: how well the pages answer the request, and what to explore next. Null if they answer it well.'),
 })
-export type Spot = z.infer<typeof SpotsSchema>['spots'][number]
+type Read = z.infer<typeof ReadSchema>
 
 function plan(request: string) {
   return ask(
@@ -52,12 +60,10 @@ function plan(request: string) {
 }
 
 function pick(hits: Hit[]): Hit[] {
-  const seen = new Set<string>()
   const picked: Hit[] = []
   let spent = 0
-  for (const hit of [...hits].sort((a, b) => b.relevance - a.relevance)) {
-    if (seen.has(hit.id) || hit.relevance < 0.25) continue
-    seen.add(hit.id)
+  for (const hit of hits) {
+    if (hit.relevance < 0.25) continue
     if (picked.length >= MAX_ARTICLES || spent + hit.cost > UNLOCK_BUDGET_USD) continue
     picked.push(hit)
     spent += hit.cost
@@ -65,15 +71,21 @@ function pick(hits: Hit[]): Hit[] {
   return picked
 }
 
-async function extractSpots(request: string, articles: Article[]) {
+function dedupe(hits: Hit[]): Hit[] {
+  const seen = new Set<string>()
+  return [...hits].sort((a, b) => b.relevance - a.relevance).filter((h) => !seen.has(h.id) && seen.add(h.id))
+}
+
+function readArticles(request: string, articles: Article[]) {
   const sources = articles
     .map((a) => `<article id="${a.id}">\n${a.journal} ${a.date} p.${a.page ?? '?'} - ${a.title}\n\n${a.text}\n</article>`)
     .join('\n\n')
   return ask(
-    SpotsSchema,
-    `You extract places a traveller could visit from Japanese outdoor magazine pages.
-Only list places actually named in the articles (trails, mountains, lakes, onsen, viewpoints, routes, golf courses, huts). Never invent places.
-Write English for a visitor. Quotes must be short verbatim excerpts; the content is licensed.`,
+    ReadSchema,
+    `You read Japanese outdoor magazine pages (PEAKS, Randonnee, BiCYCLE CLUB, EVEN) for a traveller.
+For every article write an English headline and summary that makes the traveller curious.
+List as spots only places actually named in the articles (trails, mountains, lakes, onsen, viewpoints, routes, golf courses, inns, huts). Never invent places.
+Quotes must be short verbatim excerpts; the content is licensed.`,
     `Traveller request: ${request}\n\n${sources}`,
     { effort: 'medium', maxTokens: 8000 },
   )
@@ -123,49 +135,35 @@ function distanceKm(a: { lat: number; lon: number }, b: { lat: number; lon: numb
   return 12742 * Math.asin(Math.sqrt(h))
 }
 
-export async function explore(request: string, send: Send) {
-  send({ type: 'status', message: 'Reading your request' })
-  const { intent_en, queries_ja } = await plan(request)
-  send({ type: 'plan', intent: intent_en, queries: queries_ja })
+const lockedCard = ({ id, queryId, title, journal, date, page, cost, snippet, figureCount, relevance }: Hit) => ({
+  id, queryId, title, journal, date, page, cost, snippet, figureCount, relevance,
+})
 
-  const hits = (await Promise.all(queries_ja.map((q) => previewAddix(q)))).flat()
-  const picked = pick(hits)
-  send({
-    type: 'previewed',
-    found: new Set(hits.map((h) => h.id)).size,
-    picked: picked.length,
-    estimate: picked.reduce((s, h) => s + h.cost, 0),
-  })
-  if (!picked.length) {
-    send({ type: 'done', spots: [], note: 'The ADDIX magazines have nothing close to this request. Try a hike, cycling route, onsen or golf near Tokyo.' })
-    return
-  }
-
-  send({ type: 'status', message: `Unlocking ${picked.length} magazine pages` })
-  const groups = new Map<string, Hit[]>()
-  for (const h of picked) groups.set(h.queryId, [...(groups.get(h.queryId) ?? []), h])
-  const unlocked = await Promise.all([...groups.values()].map(unlockAddix))
-  const articles = unlocked.flatMap((u) => u.articles)
-  send({
-    type: 'unlocked',
-    count: articles.length,
-    charged: unlocked.reduce((s, u) => s + u.charged, 0),
-    balance: unlocked.map((u) => u.balance).filter((b) => b !== undefined).at(-1),
-  })
-
-  send({ type: 'status', message: 'Finding the places in the articles' })
-  const { spots, no_match_note } = await extractSpots(request, articles)
-
-  send({ type: 'status', message: `Placing ${spots.length} spots on the map` })
+/** Article cards plus geocoded spots for a set of unlocked pages. */
+async function present(request: string, articles: Article[], read: Read) {
   const byId = new Map(articles.map((a) => [a.id, a]))
-  const placed = []
-  for (const spot of spots) {
-    const point = await geocode(spot.name_ja, spot.area_ja)
+  const summaries = new Map(read.articles.map((a) => [a.source_id, a]))
+  const cards = articles.map((a) => ({
+    id: a.id,
+    queryId: a.queryId,
+    title: a.title,
+    journal: a.journal,
+    date: a.date,
+    page: a.page,
+    text: a.text,
+    photos: a.figures.map((f) => `/api/figures/${f}`),
+    headline_en: summaries.get(a.id)?.headline_en ?? a.title,
+    summary_en: summaries.get(a.id)?.summary_en ?? '',
+  }))
+  const spots = []
+  for (const spot of read.spots) {
     const article = byId.get(spot.source_id)
+    const point = article && (await geocode(spot.name_ja, spot.area_ja))
     if (!point || !article) continue
     const nearest = STATIONS.map((s) => ({ ...s, km: distanceKm(point, s) })).sort((a, b) => a.km - b.km)[0]
-    placed.push({
+    spots.push({
       ...spot,
+      articleId: article.id,
       lat: point.lat,
       lon: point.lon,
       geocodedAs: point.label,
@@ -175,5 +173,61 @@ export async function explore(request: string, send: Send) {
       nearestStation: nearest ? { ...nearest, km: Math.round(nearest.km * 10) / 10 } : null,
     })
   }
-  send({ type: 'done', spots: placed, unplaced: spots.length - placed.length, note: no_match_note })
+  return { articles: cards, spots }
+}
+
+async function unlockAll(hits: Hit[]) {
+  const groups = new Map<string, Hit[]>()
+  for (const h of hits) groups.set(h.queryId, [...(groups.get(h.queryId) ?? []), h])
+  const unlocked = await Promise.all([...groups.values()].map(unlockAddix))
+  return {
+    articles: unlocked.flatMap((u) => u.articles),
+    charged: unlocked.reduce((s, u) => s + u.charged, 0),
+    balance: unlocked.map((u) => u.balance).filter((b) => b !== undefined).at(-1),
+  }
+}
+
+export async function explore(request: string, send: Send) {
+  send({ type: 'status', message: 'Reading your request' })
+  const { intent_en, queries_ja } = await plan(request)
+  send({ type: 'plan', intent: intent_en, queries: queries_ja })
+
+  const hits = dedupe((await Promise.all(queries_ja.map((q) => previewAddix(q)))).flat())
+  const picked = pick(hits)
+  const pickedIds = new Set(picked.map((h) => h.id))
+  const locked = hits.filter((h) => !pickedIds.has(h.id) && h.relevance >= 0.15).slice(0, MAX_LOCKED).map(lockedCard)
+  send({ type: 'previewed', found: hits.length, picked: picked.length, estimate: picked.reduce((s, h) => s + h.cost, 0) })
+  if (!picked.length) {
+    send({ type: 'done', articles: [], spots: [], locked, note: 'The ADDIX magazines have nothing close to this request. Try a hike, cycling route, onsen or golf near Tokyo.' })
+    return
+  }
+
+  send({ type: 'status', message: `Unlocking ${picked.length} magazine pages` })
+  const { articles, charged, balance } = await unlockAll(picked)
+  send({ type: 'unlocked', count: articles.length, charged, balance })
+
+  send({ type: 'status', message: 'Reading the articles' })
+  const read = await readArticles(request, articles)
+  send({ type: 'status', message: `Placing ${read.spots.length} spots on the map` })
+  const result = await present(request, articles, read)
+  send({ type: 'done', ...result, locked, note: read.note })
+}
+
+/** Unlock one more page the user chose, and read it. */
+export async function unlockOne(request: string, hit: Hit) {
+  const { articles, charged, balance } = await unlockAll([hit])
+  const read = await readArticles(request, articles)
+  return { ...(await present(request, articles, read)), charged, balance, note: read.note }
+}
+
+/** Dig deeper: more pages from the same magazine issue, nearest page numbers first. */
+export async function moreFromIssue(article: { id: string; title: string; journal?: string; date?: string; page?: number; text: string }) {
+  const query = `${article.title} ${article.text.slice(0, 120)}`
+  const filters = { journal: article.journal, publication_date: article.date }
+  const hits = await previewAddix(query, 15, filters)
+  return hits
+    .filter((h) => h.id !== article.id)
+    .sort((a, b) => Math.abs((a.page ?? 999) - (article.page ?? 0)) - Math.abs((b.page ?? 999) - (article.page ?? 0)))
+    .slice(0, 6)
+    .map(lockedCard)
 }

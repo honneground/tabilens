@@ -16,6 +16,7 @@ export interface Spot {
   source: { title: string; journal?: string; date?: string; page?: number }
   photos: string[]
   nearestStation: { id: string; name: string; name_en: string; line: string; km: number } | null
+  articleId?: string
 }
 
 export const KIND_EMOJI: Record<string, string> = {
@@ -42,7 +43,7 @@ const originFor = (line: string) => (line === 'tojo' || line === 'ogose' ? { id:
 
 const hhmm = (t: string) => t.slice(0, 5)
 
-function Trains({ station }: { station: NonNullable<Spot['nearestStation']> }) {
+export function Trains({ station }: { station: NonNullable<Spot['nearestStation']> }) {
   const origin = originFor(station.line)
   const [trains, setTrains] = useState<Train[] | null>(null)
   const [error, setError] = useState<string | null>(null)

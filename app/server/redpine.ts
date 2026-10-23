@@ -87,10 +87,13 @@ export async function cached<T>(kind: string, key: unknown, fn: () => Promise<T>
 }
 
 /** Free: ranked ADDIX hits with snippets and per-row unlock cost. */
-export function previewAddix(query: string, limit = 8): Promise<Hit[]> {
-  return cached('preview', { query, limit }, async () => {
+export function previewAddix(query: string, limit = 8, filters?: Record<string, unknown>): Promise<Hit[]> {
+  return cached('preview', filters ? { query, limit, filters } : { query, limit }, async () => {
     const data = parseJson(
-      await callTool('preview', { tool_name: 'search', arguments: { collection: 'addix', query, limit } }),
+      await callTool('preview', {
+        tool_name: 'search',
+        arguments: { collection: 'addix', query, limit, ...(filters ? { filters } : {}) },
+      }),
     )
     return (data.results ?? []).map(
       (row: any): Hit => ({
