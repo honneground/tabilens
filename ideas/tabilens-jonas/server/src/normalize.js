@@ -1,6 +1,4 @@
 // Map raw Redpine / Tobu payloads into the frontend's Unified JSON Payload.
-// The exact response shapes are unknown until we inspect them live —
-// every function here is defensive and marked with TODOs to tighten at the venue.
 
 const first = (...vals) => vals.find((v) => v !== undefined && v !== null && v !== '');
 
@@ -11,23 +9,22 @@ function results(payload) {
 export function spotFrom(payload, intent) {
   const r = results(payload)[0];
   if (!r) return null;
-  // TODO(live): confirm field names from inspect-tool on the ADDIX search tool.
   return {
     id: first(r.id, r.result_id),
     name: first(r.title, r.heading, 'Untitled spot'),
-    area: first(r.metadata?.area, r.area, ''),
-    difficulty: first(r.metadata?.difficulty, intent.level),
-    summary: first(r.text, r.passage, r.snippet, ''),
-    nearestStation: first(r.metadata?.nearest_station, null),
+    area: first(r.metadata?.area, r.area, intent.areaHint || 'Tochigi'),
+    difficulty: first(r.metadata?.difficulty, intent.level, 'Moderate'),
+    summary: first(r.text, r.passage, r.chunks?.[0]?.snippet, r.snippet, ''),
+    nearestStation: first(r.metadata?.nearest_station, intent.destinationStation, 'Tobu-Nikko'),
     figures: (r.figures ?? r.images ?? []).map((f) => ({
-      url: first(f.url, f.src),
+      url: first(f.url, f.src, f.image_url),
       caption: first(f.caption, ''),
       credit: first(f.credit, r.publisher, 'ADDIX'),
     })),
     citation: {
       magazine: first(r.journal, r.magazine, r.source, intent.magazineHint),
       publisher: first(r.publisher, 'ADDIX'),
-      issue: first(r.issue, r.publication_date, ''),
+      issue: first(r.issue, r.publication_date, r.year, ''),
       title: first(r.title, ''),
       url: first(r.url, r.doi ? `https://doi.org/${r.doi}` : null),
     },
@@ -35,12 +32,11 @@ export function spotFrom(payload, intent) {
 }
 
 // Pull lat/lng out of whatever shape a stop or spot comes back in.
-// TODO(live): confirm coordinate field names on tobu--find_stop and ADDIX metadata.
 export function coords(obj) {
-  const r = results(obj)[0] ?? obj;
+  const r = obj?.rail?.[0] ?? obj?.bus?.[0] ?? results(obj)[0] ?? obj;
   if (!r) return null;
-  const lat = Number(first(r.lat, r.latitude, r.location?.lat, r.metadata?.lat, r.metadata?.latitude));
-  const lng = Number(first(r.lng, r.lon, r.longitude, r.location?.lng, r.location?.lon, r.metadata?.lng, r.metadata?.lon, r.metadata?.longitude));
+  const lat = Number(first(r.lat, r.latitude, r.location?.lat, r.metadata?.lat));
+  const lng = Number(first(r.lng, r.lon, r.longitude, r.location?.lng, r.location?.lon, r.metadata?.lng, r.metadata?.lon));
   return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
 }
 
@@ -57,29 +53,33 @@ export function placesFrom({ origin, originStop, destName, destStop, transit, sp
 }
 
 export function stopId(payload) {
-  // TODO(live): tobu--find_stop response shape.
+  const rail0 = payload?.rail?.[0];
+  if (rail0?.station_id) return rail0.station_id;
+  const bus0 = payload?.bus?.[0];
+  if (bus0?.stop_id || bus0?.station_id) return bus0.stop_id || bus0.station_id;
   const r = results(payload)[0] ?? payload;
   return first(r?.station_id, r?.stop_id, r?.id, null);
 }
 
 export function transitFrom({ departures, busLinks, origin, destName }) {
-  // TODO(live): tobu--rail_departures / tobu--station_bus_links shapes.
-  const rail = results(departures).slice(0, 3).map((d) => ({
+  const railResults = departures?.results ?? results(departures);
+  const rail = railResults.slice(0, 3).map((d) => ({
     type: 'rail',
-    service: first(d.train_type, d.service, d.name, 'Tobu Line'),
-    trainNumber: first(d.train_number, d.number, ''),
-    from: origin,
-    to: destName,
-    depart: first(d.departure_time, d.depart, d.departure),
-    arrive: first(d.arrival_time, d.arrive, d.arrival),
+    service: first(d.type_en, d.type, d.train_type, 'Limited Express'),
+    trainNumber: first(d.train_no, d.number, ''),
+    from: departures?.from?.name_en || origin,
+    to: departures?.to?.name_en || destName,
+    depart: first(d.dep, d.departure_time),
+    arrive: first(d.arr_at_to, d.arrival_time),
     platform: first(d.platform, ''),
   }));
-  const bus = results(busLinks).slice(0, 3).map((b) => ({
+  const busStops = busLinks?.bus_stops ?? results(busLinks);
+  const bus = busStops.slice(0, 3).map((b) => ({
     type: 'bus',
-    service: first(b.route_name, b.route, 'Tobu Bus'),
+    service: first(b.name_en, b.name, 'Tobu Bus'),
     from: destName,
-    stop: first(b.pole, b.stop_name, b.platform, ''),
-    to: first(b.destination, b.to, ''),
+    stop: first(b.poles?.[0]?.pole ? `Pole ${b.poles[0].pole}` : null, b.stop_code, ''),
+    to: first(b.poles?.[0]?.destinations?.[0], b.office, ''),
     depart: first(b.departure_time, b.depart, ''),
     arrive: first(b.arrival_time, b.arrive, ''),
   }));
@@ -95,22 +95,25 @@ export function rideMinutes(transit) {
   const leg = transit?.outbound?.find((l) => l.type === 'rail');
   if (!leg?.depart || !leg?.arrive) return null;
   const toMin = (t) => {
-    const [h, m] = String(t).slice(-5).split(':').map(Number);
-    return h * 60 + m;
+    const parts = String(t).split(':').map(Number);
+    if (parts.length >= 2) return parts[0] * 60 + parts[1];
+    return null;
   };
-  return toMin(leg.arrive) - toMin(leg.depart);
+  const d = toMin(leg.depart);
+  const a = toMin(leg.arrive);
+  if (d === null || a === null) return null;
+  return a >= d ? a - d : a + 24 * 60 - d;
 }
 
 export function audioFrom(payload, rideMinutes) {
   const r = results(payload)[0];
   if (!r) return null;
-  // TODO(live): confirm where include_audio puts the playable URL.
   return {
-    title: first(r.title, 'Commute briefing'),
-    source: first(r.publisher, r.source, 'Chronicle News Connect'),
-    url: first(r.audio_url, r.audio?.url, r.media?.url, null),
-    durationSec: first(r.duration_sec, r.audio?.duration, null),
-    transcriptSnippet: first(r.snippet, r.text, ''),
-    fitsRide: rideMinutes ? `${rideMinutes} min ride` : null,
+    title: first(r.title, 'Chronicle Commute Briefing'),
+    source: first(r.journal, r.source, 'Chronicle News Connect'),
+    durationSec: Number(first(r.metadata?.duration_sec, r.duration_sec, 120)),
+    url: first(r.audio_url, r.url, null),
+    transcriptSnippet: first(r.text, r.chunks?.[0]?.snippet, r.snippet, ''),
+    rideMinutes,
   };
 }

@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { loadGoogleMaps } from '../lib/loadGoogleMaps.js';
 
 const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-// Google's public test Map ID — swap for your own Map ID (Cloud Console → Map Management) to style the map.
 const MAP_ID = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID || 'DEMO_MAP_ID';
 
 const STYLE = {
@@ -14,11 +13,17 @@ const STYLE = {
 
 export default function MapView({ places = [] }) {
   const el = useRef(null);
-  const [error, setError] = useState(null);
+  const [useLeaflet, setUseLeaflet] = useState(!API_KEY);
 
   useEffect(() => {
-    if (!API_KEY || !el.current || places.length === 0) return;
+    if (!el.current || places.length === 0) return;
     let cancelled = false;
+
+    if (!API_KEY || useLeaflet) {
+      renderLeafletMap(el.current, places);
+      return;
+    }
+
     const markers = [];
 
     (async () => {
@@ -54,7 +59,6 @@ export default function MapView({ places = [] }) {
           bounds.extend(p.position);
         });
 
-        // Trip line: straight segments between stops (illustrative, not the actual track).
         new Polyline({
           map,
           path: resolved.filter((p) => p.position).map((p) => p.position),
@@ -66,22 +70,37 @@ export default function MapView({ places = [] }) {
 
         if (!bounds.isEmpty()) map.fitBounds(bounds, 48);
       } catch (e) {
-        if (!cancelled) setError(e.message);
+        console.warn('Google Maps unavailable, falling back to Leaflet:', e.message);
+        if (!cancelled) {
+          setUseLeaflet(true);
+          renderLeafletMap(el.current, places);
+        }
       }
     })();
 
     return () => {
       cancelled = true;
       markers.forEach((m) => (m.map = null));
+      if (el.current?._leaflet_map) {
+        el.current._leaflet_map.remove();
+        delete el.current._leaflet_map;
+      }
     };
-  }, [places]);
+  }, [places, useLeaflet]);
 
   const directionsUrl = buildDirectionsUrl(places);
 
   return (
     <section className="overflow-hidden rounded-2xl border border-line bg-white shadow-sm">
       <div className="flex items-center justify-between px-5 py-3">
-        <h2 className="font-display text-lg font-bold text-moss-dark">Route map</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="font-display text-lg font-bold text-moss-dark">Route map</h2>
+          {useLeaflet && (
+            <span className="rounded-full bg-sand px-2 py-0.5 text-[10px] font-mono text-ink/60">
+              OpenStreetMap
+            </span>
+          )}
+        </div>
         {directionsUrl && (
           <a
             href={directionsUrl}
@@ -94,15 +113,7 @@ export default function MapView({ places = [] }) {
         )}
       </div>
 
-      {!API_KEY ? (
-        <p className="px-5 pb-5 text-sm text-ink/60">
-          Add <code>VITE_GOOGLE_MAPS_API_KEY</code> to <code>web/.env</code> to show the map.
-        </p>
-      ) : error ? (
-        <p className="px-5 pb-5 text-sm text-maple">{error}</p>
-      ) : (
-        <div ref={el} className="h-80 w-full bg-paper" />
-      )}
+      <div ref={el} className="h-80 w-full bg-sand-light" />
 
       <ol className="flex flex-wrap gap-x-4 gap-y-1 border-t border-line px-5 py-3 text-xs text-ink/70">
         {places.map((p) => (
@@ -116,7 +127,56 @@ export default function MapView({ places = [] }) {
   );
 }
 
-// Use given coordinates; geocode by name only when they're missing (needs Geocoding API enabled).
+function renderLeafletMap(container, places) {
+  if (!window.L || !container) return;
+  if (container._leaflet_map) {
+    container._leaflet_map.remove();
+    delete container._leaflet_map;
+  }
+
+  const validPlaces = places.filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
+  const center = validPlaces[0] ? [validPlaces[0].lat, validPlaces[0].lng] : [36.2, 139.6];
+
+  const map = window.L.map(container, {
+    zoomControl: false,
+    attributionControl: false,
+  }).setView(center, 9);
+  container._leaflet_map = map;
+
+  window.L.control.zoom({ position: 'topright' }).addTo(map);
+
+  window.L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    maxZoom: 18,
+    subdomains: 'abcd',
+  }).addTo(map);
+
+  const latlngs = [];
+  validPlaces.forEach((p, idx) => {
+    const s = STYLE[p.kind] ?? STYLE.spot;
+    const glyph = p.kind === 'origin' ? String(idx + 1) : s.glyph;
+    const icon = window.L.divIcon({
+      className: 'custom-leaflet-pin',
+      html: `<div style="background:${s.bg}; color:#fff; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; border:2px solid #fff; font-size:12px; font-weight:bold; box-shadow:0 2px 6px rgba(0,0,0,0.3);">${glyph}</div>`,
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
+    });
+
+    const marker = window.L.marker([p.lat, p.lng], { icon }).addTo(map);
+    marker.bindPopup(`<strong>${p.name}</strong>`);
+    latlngs.push([p.lat, p.lng]);
+  });
+
+  if (latlngs.length > 1) {
+    window.L.polyline(latlngs, {
+      color: '#2f5d46',
+      weight: 3.5,
+      dashArray: '6, 8',
+      opacity: 0.8,
+    }).addTo(map);
+    map.fitBounds(latlngs, { padding: [40, 40] });
+  }
+}
+
 async function resolveCoords(places, geocoder) {
   return Promise.all(
     places.map(async (p) => {
@@ -132,7 +192,6 @@ async function resolveCoords(places, geocoder) {
   );
 }
 
-// Universal Maps URL — works without an API key and opens the app on phones.
 function buildDirectionsUrl(places) {
   const pts = places.filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
   if (pts.length < 2) return null;

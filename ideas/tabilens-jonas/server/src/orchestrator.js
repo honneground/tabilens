@@ -32,7 +32,7 @@ export async function planTrip({ query, origin = 'Asakusa' }) {
   const spotRes = await timed(trace, 'redpine.preview→confirm(magazines)', () =>
     previewThenConfirm(
       config.tools.magazineSearch,
-      { query: intent.searchSentence, top_k: 5 },
+      { collection: 'ADDIX Magazines', query: intent.searchSentence, limit: 5 },
       { include_figures: true }
     )
   );
@@ -64,7 +64,7 @@ export async function planTrip({ query, origin = 'Asakusa' }) {
   const audioRes = await timed(trace, 'redpine.preview→confirm(audio)', () =>
     previewThenConfirm(
       config.tools.audioSearch,
-      { query: `${spot?.area || destName} travel, nature and local culture`, top_k: 3 },
+      { collection: 'Chronicle News Connect', query: `${spot?.area || destName} travel, nature and local culture`, limit: 3 },
       { include_audio: true }
     )
   );
