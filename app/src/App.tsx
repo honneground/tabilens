@@ -290,12 +290,12 @@ export default function App() {
   const readingRun = reading ? runs.find((r) => r.id === reading.runId) : undefined
 
   const searchBox = (
-    <div className="pointer-events-auto rounded-2xl bg-white/95 p-3 shadow-lg backdrop-blur">
-      <span className="text-lg font-semibold tracking-tight">
+    <div className="pointer-events-none grid w-full grid-cols-[auto_minmax(0,1fr)] items-center gap-3">
+      <span className="flex self-stretch items-center rounded-2xl bg-white/95 px-3 text-lg font-semibold tracking-tight shadow-sm backdrop-blur">
         TabiLens
       </span>
       <form
-        className="mt-2 flex gap-2"
+        className="pointer-events-auto flex min-w-0 gap-2 rounded-2xl border border-gray-200 bg-white/95 p-1.5 shadow-lg backdrop-blur"
         onSubmit={(e) => {
           e.preventDefault()
           void explore()
@@ -304,20 +304,22 @@ export default function App() {
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Where do you want to escape to? e.g. easy lake walk with onsen"
-          className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-gray-400"
+          placeholder="Where would you like to go?"
+          aria-label="Search places and experiences"
+          className="min-w-0 flex-1 rounded-xl bg-transparent px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-gray-300"
         />
         <button disabled={busy} className="rounded-xl bg-[#c8102e] px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
           {busy ? 'Exploring…' : 'Explore'}
         </button>
       </form>
-      <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+      <div className="pointer-events-auto col-span-2 flex gap-2 overflow-x-auto pb-1" role="group" aria-label="Filter by interest">
         {INTERESTS.map((i) => (
           <button
             key={i}
+            aria-pressed={interest === i}
             onClick={() => setInterest(interest === i ? null : i)}
             className={`shrink-0 rounded-full border px-3 py-1 text-xs ${
-              interest === i ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 bg-white text-gray-700'
+              interest === i ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 bg-white/95 text-gray-700 shadow-sm backdrop-blur'
             }`}
           >
             {i}
@@ -328,7 +330,7 @@ export default function App() {
   )
 
   const map = (
-    <div className="relative h-full w-full">
+    <div className="relative h-full w-full overflow-hidden rounded-2xl shadow">
       <MapContainer center={[ASAKUSA.lat, ASAKUSA.lon]} zoom={9} zoomControl={false} className="h-full w-full">
         <TileLayer key={basemap} url={tiles.url} attribution={tiles.attribution} maxZoom={18} />
         <ClickHandler onPick={pick} />
@@ -375,11 +377,9 @@ export default function App() {
         {pin && pin !== you && <Marker position={[pin.lat, pin.lon]} icon={pinIcon} />}
       </MapContainer>
 
-      {!researching && (
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-[1000] p-4">
-          <div className="mx-auto max-w-xl">{searchBox}</div>
-        </div>
-      )}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-[1000] p-4">
+        {searchBox}
+      </div>
 
       <div className="absolute right-3 bottom-6 z-[1000] flex flex-col gap-2">
         <button onClick={locate} className="h-11 w-11 rounded-full bg-white text-lg shadow-lg" aria-label="Show my location" title="Show my location">
@@ -452,15 +452,12 @@ export default function App() {
     </div>
   )
 
-  if (!researching) return <div className="h-full w-full">{map}</div>
+  if (!researching) return <div className="h-full w-full p-[8px]">{map}</div>
 
   return (
     <div className="grid h-full w-full grid-cols-[minmax(0,1fr)_440px_360px]">
-      <div className="flex min-h-0 flex-col">
-        <div className="z-[1001] p-3 pb-0">{searchBox}</div>
-        <div className="min-h-0 flex-1 p-3">
-          <div className="h-full overflow-hidden rounded-2xl shadow">{map}</div>
-        </div>
+      <div className="relative min-h-0 min-w-0 overflow-hidden p-[8px]">
+        {map}
       </div>
 
       <main className="min-h-0 space-y-8 overflow-y-auto bg-[#faf8f4] p-4">
