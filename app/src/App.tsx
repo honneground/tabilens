@@ -291,8 +291,10 @@ export default function App() {
 
   const searchBox = (
     <div className="pointer-events-none grid w-full grid-cols-[auto_minmax(0,1fr)] items-center gap-3">
-      <span className="flex self-stretch items-center rounded-2xl bg-white/95 px-3 text-lg font-semibold tracking-tight shadow-sm backdrop-blur">
-        TabiLens
+      <span className="flex self-stretch items-center rounded-2xl bg-white/95 px-2 shadow-sm backdrop-blur">
+        <span className="relative m-[3px] block h-[60px] w-[136px] overflow-hidden">
+          <img src="/logo_full.png" alt="TabiLens" draggable={false} className="absolute -top-[20px] -left-[24px] w-[184px] max-w-none" />
+        </span>
       </span>
       <form
         className="pointer-events-auto flex min-w-0 gap-2 rounded-2xl border border-gray-200 bg-white/95 p-1.5 shadow-lg backdrop-blur"
