@@ -15,7 +15,8 @@
 
 ## Repo layout
 
-- `ideas/<name>/`: one prototype per folder, each with its own README. Read these before building the combined solution.
+- `app/`: the main app (TabiLens), promoted from `ideas/tabilens-oskar`. Build here; see `app/README.md`.
+- `ideas/<name>/`: one prototype per folder, each with its own README. Mine them for ideas to bring into `app/`.
 
 ## Rules
 
