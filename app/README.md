@@ -6,7 +6,7 @@ Map-first day-trip finder: ADDIX outdoor magazine spots pinned on a map, with th
 
 - Leaflet map (OpenStreetMap, or GSI topo) with 69 Tobu stations from `src/data/stations.json`, fetched once via Redpine's free `tobu--find_stop` (partial list, 206 exist).
 - Tap the map or use your location to get the nearest stations.
-- **Explore**: Claude writes Japanese ADDIX searches → free Redpine previews → unlock the best pages (capped at $2.50) with photos → Claude extracts only places named in the pages → free geocoding (Nominatim, then GSI) → emoji pins.
+- **Explore**: the selected model writes Japanese ADDIX searches → free Redpine previews → unlock the best pages (capped at $2.50) with photos → the model extracts only places named in the pages → free geocoding (Nominatim, then GSI) → emoji pins.
 - Spot card: magazine photo, summary, quote, citation (magazine, issue, page), nearest Tobu station and the next trains from Asakusa or Ikebukuro (`tobu--rail_departures`, free).
 
 ## Run
@@ -22,11 +22,12 @@ npm run dev      # map on :5173, proxies /api to the server
 
 Restart `npm run server` after editing `.env`; it is only read at startup.
 
-### How Claude is called (`server/llm.ts`)
+### Model backends (`server/llm.ts`)
 
 - With a Console key (`sk-ant-api...`) in `.env`: the Anthropic API (`claude-opus-5`).
-- Without one: the local `claude -p` CLI on your own Claude Code login. Local prototyping only, never for a hosted or shared app. Each call takes ~5-10 s.
-- Force either with `LLM_BACKEND=api` or `LLM_BACKEND=claude-cli`.
+- Without one: the local `claude -p` CLI on your Claude Code login.
+- With `LLM_BACKEND=antigravity`: the local `agy -p` CLI on your Antigravity login. Use `AGY_MODEL` to select an available model and `AGY_PATH` to specify the executable when needed.
+- Select explicitly with `LLM_BACKEND=api`, `LLM_BACKEND=claude-cli`, or `LLM_BACKEND=antigravity`.
 
 Redpine results, geocodes and photos are cached in `.cache/` (gitignored, licensed content), so repeat searches are free and instant.
 
@@ -45,7 +46,7 @@ Redpine results, geocodes and photos are cached in `.cache/` (gitignored, licens
 - `src/SpotCard.tsx` spot details and train times
 - `server/index.ts` HTTP API: `POST /api/explore` (NDJSON progress stream), `GET /api/trains`, `GET /api/figures/:name`
 - `server/explore.ts` the explore pipeline (plan → search → unlock → extract → geocode)
-- `server/llm.ts` Claude via API or local CLI
+- `server/llm.ts` selectable Claude API, Claude Code, or Antigravity backend
 - `server/redpine.ts` Redpine MCP client (`https://api.redpine.ai/mcp`): preview, confirm with figures, Tobu tools
 
 ## Known gaps
